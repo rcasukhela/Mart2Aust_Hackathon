@@ -165,19 +165,19 @@ def yardley_variants(OR):
         MB = None
 
         ## Reduce redundancies, if they exist (for example, as in NW)
-        T = R_mat_2_tvec(V)
+        #T = R_mat_2_tvec(V)
         V = None
         #_, idx = unique(sigdec(T,7),'rows','first')
 
         # T=T(sort(idx),:); % don't allow reordering!
 
         ## Check if results are valid
-        if isreal(T):
-            V = TVec_2_RMat(T)
-        else:
-            V = TVec_2_RMat(T)
-            flag = 1
-            raise Warning('Ksi values produce some imaginary numbers.')
+        #if isreal(T):
+        #    V = TVec_2_RMat(T)
+        #else:
+        #    V = TVec_2_RMat(T)
+        #    flag = 1
+        #    raise Warning('Ksi values produce some imaginary numbers.')
 
         varargout = flag
 

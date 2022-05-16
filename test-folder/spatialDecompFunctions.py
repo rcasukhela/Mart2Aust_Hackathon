@@ -117,6 +117,7 @@ def erase_linearly_dependent_points(points):
     --------------
     from scipy.spatial import ConvexHull
     '''
+    import numpy as np
     from scipy.spatial import ConvexHull
     k = ConvexHull(points)
 
@@ -152,3 +153,5 @@ def erase_linearly_dependent_points(points):
     print(unitCell)
     radius = np.mean( np.sqrt(np.sum(unitCell**2,2)) )
     edgeLength = np.sqrt( np.sum( np.diff(boundingX)**2, axis = 2) )
+
+    return k

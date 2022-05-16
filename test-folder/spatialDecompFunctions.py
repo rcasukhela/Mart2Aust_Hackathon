@@ -73,7 +73,7 @@ def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     # now check whether the have a misorientation heigher or lower than a threshold
     o1 = q[D_l] # orientation of node u
     o2 = q[D_r] # orientation of node v
-    m = Misorientation([o1.data, o2.data]) # misorientations between every u and v
+    m = Misorientation(o1 * o2.conj) # misorientations between every u and v
     m.symmetry = (CS, CS) # Oh is symmetry (need to un-hard code)
     m = m.map_into_symmetry_reduced_zone() #TODO: The result of this doesn't actually make sense. Why are there two rows?
     

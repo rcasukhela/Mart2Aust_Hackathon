@@ -100,3 +100,57 @@ def generateUnitCells(xy, unitCell):
     faces = np.reshape(n, [-1,np.size(unitCell[:,1])]);
     
     return v, faces
+
+def erase_linearly_dependent_points(points):
+    '''
+    subfunction to remove linearly dependent points.
+
+    Inputs:
+    --------------
+    k : ???
+        ???
+
+    Outputs:
+    --------------
+    ??? : ???
+        ???
+
+    Dependencies:
+    --------------
+    from scipy.spatial import ConvexHull
+    '''
+    from scipy.spatial import ConvexHull
+    k = ConvexHull(points)
+
+    # erase all linear dependent points
+    angle = np.arctan2( 
+        x[k.vertices[0:-1]]-x[k.vertices[1:]],
+        y[k.vertices[0:-1]]-y[k.vertices[1:]]
+    )
+    test = np.abs(np.diff(angle))>np.spacing(1.0)
+    k2 = k.vertices[np.concatenate([[True], test, [True]])]
+    boundingX = [x[k2], y[k2]]
+
+    cellRot=0
+
+################################################################################
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+                    # REQUIRES SUBROUTINE CONSTRUCTION #
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+    
+    unitCell = util.regularPoly(4,xstp,cellRot)
+
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+                    # REQUIRES SUBROUTINE CONSTRUCTION #
+#------------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+################################################################################
+
+    print(unitCell)
+    radius = np.mean( np.sqrt(np.sum(unitCell**2,2)) )
+    edgeLength = np.sqrt( np.sum( np.diff(boundingX)**2, axis = 2) )

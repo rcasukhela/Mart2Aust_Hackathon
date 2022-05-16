@@ -8,6 +8,7 @@ Date: 5/16/2022
 """
 
 import numpy as np
+from scipy import sparse
 from test-folder\spatialDecompFunctions import gbc_angle
 
 
@@ -17,7 +18,7 @@ def do_segmentation(I_FD, ebsd, varargin):
     # A_Do - adjecency matrix inside grain connections
 
     ## if numel(gbcValue) == 1 && length(ebsd.CSList) > 1
-    if np.size(gbcValue) = 1 and len(ebsd.CSList) > 1:
+    if np.size(gbcValue) = 1 and max((ebsd.CSList).shape) > 1:
         ##   gbcValue = repmat(gbcValue,size(ebsd.CSList))
         gbcValue = np.repeat(gbcValue, np.shape(ebsd.CSList))
 
@@ -63,15 +64,16 @@ def do_segmentation(I_FD, ebsd, varargin):
 
     # adjacency of cells that have no common boundary
     ind = connect > 0
-    A_Do = sparse(double(Dl(ind)),double(Dr(ind)),connect(ind),length(ebsd),length(ebsd))
+    # A_Do = sparse(double(Dl(ind)),double(Dr(ind)),connect(ind),length(ebsd),length(ebsd))
+    A_Do = sparse(float(Dl(ind)), float(Dr(ind)), connect(ind), len(ebsd), len(ebsd))
     if check_option(varargin,'mcl'):
         param = get_option(varargin,'mcl')
         if isempty(param), param = 1.4
-        if length(param) == 1, param = [param,4]
+        if max(param.shape) == 1, param = [param,4]
         A_Do = mclComponents(A_Do,param(1),param(2))
-        A_Db = sparse(double(Dl),double(Dr),true,length(ebsd),length(ebsd)) & ~A_Do
+        A_Db = sparse(float(Dl), float(Dr), true, max(ebsd.shape), max(ebsd.shape)) and not A_Do
     else:
-        A_Db = sparse(double(Dl(connect<1)), double(Dr(connect<1)), true, length(ebsd), length(ebsd))
+        A_Db = sparse(double(Dl(connect<1)), flaot(Dr(connect<1)), true, max(ebsd.shape), max(ebsd.shape))
 
     A_Do = A_Do | A_Do.'
 
@@ -80,7 +82,7 @@ def do_segmentation(I_FD, ebsd, varargin):
 
     # compute I_DG connected components of A_Do
     # I_DG - incidence matrix cells to grains
-    I_DG = sparse(1:length(ebsd),double(connectedComponents(A_Do)),1)
+    I_DG = sparse(1:max(ebsd.shape), flaot(connectedComponents(A_Do)),1)
 
     return A_Db, I_DG
 

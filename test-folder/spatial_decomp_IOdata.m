@@ -151,6 +151,11 @@ bX = squeeze(double(axis2quat(zvector,edgeAngle)* ...
   vector3d([0; radius; 1])));
 offsetX = bX - boundingX(1:end-1,:);
 
+writematrix(edgeDirection(k,:),'householder_input')
+writematrix(H(edgeDirection(k,:)),'householder_output')
+writematrix(offsetX(k,:),'translation_input')
+writematrix(T(offsetX(k,:)),'translation_output')
+
 for k=1:size(boundingX,1)-1
   
   % mirror the point set X on each edge

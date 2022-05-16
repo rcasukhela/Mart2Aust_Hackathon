@@ -43,12 +43,13 @@ varargin = options;
 
 loader = loadHelper(d,varargin{:});
 
-uc = calcUnitCell(loader.getColumnData({'x' 'y' 'z'}), varargin{:});
+unitCell = calcUnitCell(loader.getColumnData({'x' 'y' 'z'}), varargin{:});
 %writematrix(loader.getColumnData({'x' 'y' 'z'}),'calcUnitCell_input_d.csv')
 %writematrix(uc,'calcUnitCell_output_unitCell.csv')
 
-[V,F,I_FD] = spatialDecomposition([ebsd.prop.x(:), ebsd.prop.y(:)],ebsd.unitCell);
-%writematrix([ebsd.prop.x(:), ebsd.prop.y(:)],'spatialDecomposition_input_X.csv')
+X = [ebsd.prop.x(:), ebsd.prop.y(:)];
+[V,F,I_FD] = spatialDecomposition(X, unitCell);
+%writematrix(X,'spatialDecomposition_input_X.csv')
 %writematrix(ebsd.unitCell,'spatialDecomposition_input_unitCell.csv')
 %writematrix(V, 'spatialDecomposition_output_V')
 %writematrix(F, 'spatialDecomposition_output_F')
@@ -195,3 +196,7 @@ id = inpolygon(dummyCoordinates(:,1),dummyCoordinates(:,2),boundingX(:,1),boundi
 
 dummyCoordinates(id,:) = [];
 
+writematrix(['boundary','hull'], 'calcBoundary_input_varargin')
+writematrix(X, 'calcBoundary_input_X')
+writematrix(unitCell, 'calcBoundary_input_unitCell')
+writematrix(dummyCoordinates, 'calcBoundary_output_dummyCoordinates')

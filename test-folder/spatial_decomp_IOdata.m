@@ -196,7 +196,6 @@ id = inpolygon(dummyCoordinates(:,1),dummyCoordinates(:,2),boundingX(:,1),boundi
 
 dummyCoordinates(id,:) = [];
 
-writematrix(['boundary','hull'], 'calcBoundary_input_varargin')
 writematrix(X, 'calcBoundary_input_X')
 writematrix(unitCell, 'calcBoundary_input_unitCell')
 writematrix(dummyCoordinates, 'calcBoundary_output_dummyCoordinates')

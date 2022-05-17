@@ -161,6 +161,7 @@ T  = @(s) [ 1 0 s(1); 0 1 s(2); 0 0 1];
 
 % direction of the edge
 edgeDirection = diff(boundingX);
+assignin('base', 'edgeDir_test',edgeDirection)
 edgeAngle = atan2(edgeDirection(:,2),edgeDirection(:,1));
 edgeLength = sqrt(sum(edgeDirection.^2,2));
 

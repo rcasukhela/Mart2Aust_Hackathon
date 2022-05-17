@@ -132,8 +132,12 @@ edgeLength = sqrt(sum(diff(boundingX).^2,2));
 % fill each line segment with nodes every 20 points (in average)
 nto = fix((edgeLength>0)*4); fix(edgeLength*(2*radius));
 
+assignin('base','nto_test',nto)
 cs = cumsum([1; 1 + nto]);
+assignin('base','cs_test',cs)
+assignin('base','boundX_ini',boundingX)
 boundingX(cs,:) = boundingX;
+assignin('base','boundX_fin',boundingX)
 
 % interpolation
 for k=1:numel(nto)

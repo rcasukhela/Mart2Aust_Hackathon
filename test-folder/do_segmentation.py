@@ -9,13 +9,16 @@ Date: 5/16/2022
 
 import numpy as np
 from scipy import sparse
+import markov_clustering as mc
+import networkx as nx
+import matplotlib.pyplot as plt
 from spatialDecompFunctions import gbc_angle
 
 
 def do_segmentation(I_FD, ebsd, varargin):
     # Output
-    # A_Db - adjecency matrix of grain boundaries
-    # A_Do - adjecency matrix inside grain connections
+    # A_Db - adjacency matrix of grain boundaries
+    # A_Do - adjacency matrix inside grain connections
 
     ## if numel(gbcValue) == 1 && length(ebsd.CSList) > 1
     if np.size(gbcValue) == 1 and max((ebsd.CSList).shape) > 1:
@@ -45,26 +48,26 @@ def do_segmentation(I_FD, ebsd, varargin):
     connect = np.zeros(np.shape(Dl))
 
     ## for p = 1:numel(ebsd.phaseMap)
-    for p in 1:np.size(ebsd.phaseMap)
+    for p in range(np.size(ebsd.phaseMap)):
         # neighboured cells Dl and Dr have the same phase
         if maxDist > 0:
             ## ndx = ebsd.phaseId(Dl) == p & ebsd.phaseId(Dr) == p & xyDist < maxDist       # returns index if all true
             if p == ebsd.phaseId(Dl) and p == ebsd.phaseId(Dr) and xyDist < maxDist:
                 ndx = p
+                continue
         else:
         ## ndx = ebsd.phaseId(Dl) == p & ebsd.phaseId(Dr) == p                          # returns index if all true
             if p == ebsd.phaseId(Dl) and p == ebsd.phaseId(Dr):
                 ndx = p
-
+                continue
         ## connect(ndx) = true                                                            # Can't find connect function
-
         # check, whether they are indexed
         # ndx = ndx & ebsd.isIndexed(Dl) & ebsd.isIndexed(Dr)                             # returns index if all true
-
         # now check for the grain boundary criterion
         if any(ndx):
             ## connect(ndx) = feval(['gbc_' gbc], ebsd.rotations,ebsd.CSList{p},Dl(ndx),Dr(ndx),gbcValue{p},varargin{:})
             connect(ndx) = gbc_angle(ebsd.rotations,ebsd.CSList[p],Dl(ndx),Dr(ndx),gbcValue[p],varargin[:])
+            continue
 
     # adjacency of cells that have no common boundary
     ind = connect > 0
@@ -74,16 +77,15 @@ def do_segmentation(I_FD, ebsd, varargin):
         param = get_option(varargin,'mcl')
         if isempty(param), param = 1.4
         if max(param.shape) == 1, param = [param,4]
-        A_Do = mclComponents(A_Do,param(1),param(2))
+        ## A_Do = mclComponents(A_Do,param(1),param(2))
+        A_Do = mc.run_mcl(A_Do, param(1), param(2))                # A_Do is adjacency matrix inside grain connections
         A_Db = sparse.spmatrix(float(Dl), float(Dr), true, max(ebsd.shape), max(ebsd.shape)) and not A_Do
     else:
         A_Db = sparse.spmatrix(float(Dl(connect<1)), float(Dr(connect<1)), true, max(ebsd.shape), max(ebsd.shape))
 
     A_Do = A_Do | A_Do.'
-
     # adjacency of cells that have a common boundary
     A_Db = A_Db | A_Db.'
-
     # compute I_DG connected components of A_Do
     # I_DG - incidence matrix cells to grains
     ## I_DG = sparse(1:max(ebsd.shape), float(connectedComponents(A_Do)),1)

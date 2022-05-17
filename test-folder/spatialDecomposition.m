@@ -93,7 +93,9 @@ if ischar(method)
     case {'hull','convexhull'}
       x = X(:,1);  y = X(:,2);
       
+      assignin('base', 'X_chull_check', [x,y])
       k = convhull(x,y);
+      assignin('base', 'k_verts_check', k)
       
       % erase all linear dependend points
       angle = atan2( x(k(1:end-1))-x(k(2:end)),...
@@ -165,6 +167,7 @@ edgeLength = sqrt(sum(edgeDirection.^2,2));
 % shift the starting vertex
 bX = squeeze(double(axis2quat(zvector,edgeAngle)* ...
   vector3d([0; radius; 1])));
+assignin('base', 'bX_test', bX)
 offsetX = bX - boundingX(1:end-1,:);
 
 for k=1:size(boundingX,1)-1

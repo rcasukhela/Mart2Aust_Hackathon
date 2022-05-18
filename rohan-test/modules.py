@@ -1,143 +1,134 @@
 
 import operator
+
+import numpy
 from numpy import sqrt
 from numpy import empty, zeros
 from numpy.linalg import norm
 from math import acos, cos
 from math import pi
 
+import numpy as np
 
-def generateVariants(ksi_values):
-    '''
-    Generate variants from Kurdjumov-Sachs angles
+from scipy.spatial.transform import Rotation as R
 
-    Returns matrices of an orientation relationship specified in Kurjumov-Sachs
-    angles.
 
-    
+def vecarrayconvert(a):  # FIXME: Not necessary? Can just use asanyarray?
+    ''' convert any reasonable datatype into an n x 3 vector array'''
+    import numpy as np
+
+    # a = np.asanyarray(a)
+
+    # a = np.squeeze( np.float64( list( (a,) )))
+    # a = np.atleast_2d(np.asarray(a))
+
+    # Make the arrays indexable if they are actually scalars
+    # if np.size(a) == 1:
+    #    a = np.array([a])
+
+    a = np.atleast_1d(np.squeeze(np.asanyarray(a)))
+
+    return a
+
+
+def vecarraynorm(a):
+    nrm = []
+
+    ''' norm of an array of vectors '''
+    import numpy as np
+    ax = vecarrayconvert(a[0])
+    ay = vecarrayconvert(a[1])
+    az = vecarrayconvert(a[2])
+
+    if np.shape(ax) == np.shape(ay) == np.shape(az):
+        nrm = (ax * ax + ay * ay + az * az) ** 0.5
+    else:
+        print("vecarraynorm error: check that the lengths of arguments are equal.")
+
+    return nrm
+
+
+def uniquerows(aa):
+    ''' returns the number of unique rows in an array.
+
     Parameters
     ----------
-    ksi_values : length 3 iterable OR {'KS', 'NW', 'Bain'}
-
+    aa : numpy array
 
     Returns
     -------
-    vv : rmat object
-        rotation matrices corresponding to variants
+    cc : numpy array
+        Rows in aa without repetitions
+    ia : numpy Bool array
+        Indexing array such that cc = aa[ia]
+    ic : numpy index array
+        Indexing array such that aa = cc[ic]
+
+    Notes
+    -----
+    Mimics behavior of matlab function 'unique' with optional parameter 'rows'.
+    Algorithm modified from a stack overflow posting [1]_.
+
+    References
+    ---------
+    .. [1] http://stackoverflow.com/questions/8560440/, Accessed 2012-09-10
     '''
     import numpy as np
-    from cryspy.rot import rmat
-    from cryspy.util import vecarraynorm, uniquerows, sigdec
 
-    if isinstance(ksi_values, str):
-        ksi = namedOR(ksi_values)             
+    ind = np.lexsort(np.fliplr(aa).T)  # indices for aa sorted by rows
+    rev = np.argsort(ind)  # reverse of the sorting indices
+    ab = aa[ind]  # ab is sorted version of aa
+    dd = np.diff(ab, axis=0)  # get differences between the rows
+    ui = np.ones(np.shape(ab)[0], 'bool')  # preallocate boolean array
+    ui[1:] = (dd != 0).any(axis=1)  # if difference is zero, row is not unique
 
-    # convert ksi radians to rotation matrices
-    mb = np.zeros([2, 9]) 
+    ia = ui[rev]  # positions of unique rows in aa (original, unsorted array)
+    cc = aa[ia]  # unique rows in aa in original order
 
-    mb[0, 0] = np.cos(ksi[0])
-    mb[0, 4] = np.cos(ksi[1])
-    mb[0, 8] = np.cos(ksi[2])
+    loc = np.cumsum(np.uint64(ui)) - 1  # cumulative sum := locs of repeats in ab
 
-    costh = 0.5 * (np.sum(np.cos(ksi)) - 1.0) # sum(cos(ksi)) is the matrix trace
-    mosth = 1.0 - costh
-    sinth = np.sqrt(1.0 - costh**2.0)
+    # - rev[ia] gives us the indices of the unique rows in aa
+    # - argsort(rev[ia]) gives us the indices of the corresponding rows in cc
+    # - argsort(rev[ia])[loc] gives us the indexing relationship for ab from cc
+    # - np.argsort(rev[ia])[loc][rev] give indexing reln in original order
+    ic = np.argsort(rev[ia])[loc][rev]
 
-    r1 = np.sqrt((mb[0, 0] - costh) / mosth)
-    r2 = np.sqrt((mb[0, 4] - costh) / mosth)
-    r3 = np.sqrt((mb[0, 8] - costh) / mosth)
+    return cc, ia, ic
 
-    del costh
 
-    r1r2 = r1 * r2 * mosth
-    r1r3 = r1 * r3 * mosth
-    r2r3 = r2 * r3 * mosth
-    r3st = r3 * sinth
-    r2st = r2 * sinth
-    r1st = r1 * sinth
+def sigdec(a, n=1):
+    '''
+    Rounds the elements of a to n decimals.
+    A slight modification of Peter J. Acklam's Matlab function FIXDIG
+    '''
+    import numpy as np
+    a = vecarrayconvert(a)
+    n = vecarrayconvert(n)
+    f = np.array(10. ** n)
+    s = np.sign(a)
 
-    del r1, r2, r3, mosth, sinth
-
-    mb[0, 5] = r2r3 - r1st
-    mb[0, 7] = r2r3 + r1st
-    mb[1, :] = mb[0, :]
-    mb[0, 1] = -r1r2 + r3st
-    mb[0, 2] = -r1r3 - r2st
-    mb[0, 3] = -r1r2 - r3st
-    mb[0, 6] = -r1r3 + r2st
-
-    del r1r2, r1r3, r2r3, r3st, r2st, r1st
-
-    mb[1, 1] = -mb[0, 1]
-    mb[1, 2] = -mb[0, 2]
-    mb[1, 3] = -mb[0, 3]
-    mb[1, 6] = -mb[0, 6]
-    # mb[0] is the 'positive' solution; mb[1] is the 'negative' solution
-
-    # create Bain correspondence matrices
-    bb = np.zeros([12, 9])
-
-    bb[ 0, :] = [ 1.0, -1.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0,  1.0]
-    bb[ 1, :] = [ 0.0,  1.0, -1.0,  0.0,  1.0,  1.0,  1.0,  0.0,  0.0]
-    bb[ 2, :] = [-1.0,  0.0,  1.0,  1.0,  0.0,  1.0,  0.0,  1.0,  0.0]
-    bb[ 3, :] = [ 0.0,  1.0,  1.0,  0.0, -1.0,  1.0,  1.0,  0.0,  0.0]
-    bb[ 4, :] = [-1.0, -1.0,  0.0,  1.0, -1.0,  0.0,  0.0,  0.0,  1.0]
-    bb[ 5, :] = [ 1.0,  0.0, -1.0,  1.0,  0.0,  1.0,  0.0, -1.0,  0.0]
-    bb[ 6, :] = [ 1.0,  1.0,  0.0, -1.0,  1.0,  0.0,  0.0,  0.0,  1.0]
-    bb[ 7, :] = [-1.0,  0.0, -1.0, -1.0,  0.0,  1.0,  0.0,  1.0,  0.0]
-    bb[ 8, :] = [ 0.0, -1.0,  1.0,  0.0,  1.0,  1.0, -1.0,  0.0,  0.0]
-    bb[ 9, :] = [ 1.0,  0.0,  1.0,  1.0,  0.0, -1.0,  0.0,  1.0,  0.0]		
-    bb[10, :] = [ 0.0, -1.0, -1.0,  0.0,  1.0, -1.0,  1.0,  0.0,  0.0]
-    bb[11, :] = [-1.0,  1.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0, -1.0]
-
-    # normalize correspondence matrices
-    bb = rmat.from_array(bb / vecarraynorm(bb))
-    mb = rmat.from_array(mb)
-
-    # produce variants
-    vv = np.zeros([24, 9])
-
-    tmp = mb[0] * bb
-    vv[np.arange(0, 24, 2), :] = tmp.to_array()
-
-    tmp = mb[1] * bb
-    vv[np.arange(1, 24, 2), :] = tmp.to_array()
-
-    # reduce redundancies, if they exist (as they do, for example, in NW)
-    vv, ia, ic = uniquerows(sigdec(vv, 7))
-
-    del ia, ic
-    
-    return rmat.from_array(vv)
-
+    return s * np.around(np.absolute(a) * f) / f
 
 
 def namedOR(name):
-
-    '''
-    Returns ksi values for named orientation relationships
-
+    """ Returns ksi values for named orientation relationships
 
     Parameters
     ----------
     name : {'ks', 'nw', 'bain'}
-        Orientation relationship name 
+        Orientation relationship name
 
-    
     Returns
     -------
     ksi_values : 1x3 numpy array of floats
         ksi values in degrees
 
-    
     Notes
     -----
     TODO: Add plane parallel Greninger-Troiano, Kelly, etc.
-
     TODO: Allow 'Kurdjumov-Sachs' as well as 'ks', etc.
-    '''
+    """
     import numpy as np
-
     if isinstance(name, str):
         if name.lower() == 'ks':
             s6 = np.sqrt(6.0)
@@ -146,28 +137,25 @@ def namedOR(name):
             ksi2 = np.arccos((s6 + 18.0) / (12.0 * s3))
             ksi3 = np.arccos((s6 + 12.0) / (6.0 * s6))
             ksi = np.array([ksi1, ksi2, ksi3])
-
             del s6, s3, ksi1, ksi2, ksi3
-
         elif name.lower() == 'nw':
             s6 = np.sqrt(6)
             s2 = np.sqrt(2)
             ksi0 = np.arccos((s2 + 1.0) / s6)
             ksi = np.array([0.0, ksi0, ksi0])
-
         elif name.lower() == 'bain':
-            ksi = np.array([0.0, 0.0, 0.0])
 
+            ksi = np.array([0.0, 0.0, 0.0])
         else:
             print('namedOR: Unrecognized named OR')
-
     else:
         print('namedOR requires a string input. Returning Bain.')
         ksi = np.array([0.0, 0.0, 0.0])
 
-    return ksi * 180.0/np.pi
+    return ksi * 180.0 / np.pi
 
-def yardley_variants(OR):
+
+def yardley_variants(ksi_values):
     '''
     YardleyVariants returns the matrices corresponding to the variants
                     produced from the provided orientation relationship,
@@ -176,7 +164,7 @@ def yardley_variants(OR):
     In the case of the Kurdjumov-Sachs or Nishiyama-Wasserman orientation
     relationships, 'KS' or 'NW' can be passed to the function as OR.
 
-    If `OR` is numeric, this funciton assumes that `OR`'s first three values
+    If `OR` is numeric, this function assumes that `OR`'s first three values
     are in radians.
 
     -------------------------------------------------------------------------
@@ -199,165 +187,130 @@ def yardley_variants(OR):
     from math import acos, cos
     from math import pi
     '''
-    flag = 0
-    
-    # Parse input orientation relationship.
-    if not OR.isnumeric:
-        if OR == 'KS':
-            s6 = sqrt(6.0)
-            s3 = sqrt(3.0)
+    """ Generate variants from Kurdjumov-Sachs angles
 
-            ksi_1 = (acos( (s6+1.0)/(2.0*s3) )).real
-            ksi_2 = (acos( (s6+18.0)/(12.0*s3) )).real
-            ksi_3 = (acos( (s6+12.0)/(6.0*s6) )).real
+    Returns matrices of an orientation relationship specified in Kurjumov-Sachs
+    angles.
 
-            OR = [ksi_1 ksi_2 ksi_3]
-            
-            ksi_1 = None
-            ksi_2 = None
-            ksi_3 = None
-            s6 = None
-            s3 = None
+    Parameters
+    ----------
+    ksi_values : length 3 iterable OR {'KS', 'NW', 'Bain'}
 
-        elif OR == 'NW':
-            s6 = sqrt(6.0)
-            s2 = sqrt(2.0)
-            ksi_0 = (acos( (s2+1.0)/s6) ).real
-            OR = [0.0 ksi_0 ksi_0]
+    Returns
+    -------
+    vv : rmat object
+        rotation matrices corresponding to variants
 
-            ksi_0 = None
-            s6 = None
-            s2 = None
+    """
 
-        else:
-            raise ValueError('Unknown named orientation relationship. \
-                Please specify either ''KS'', ''NW'', or numeric.')
-        
+    if isinstance(ksi_values, str):
+        ksi = namedOR(ksi_values)
     else:
-        # Convert OR specification into radians.
-        OR = list(map(operator.mul, OR, [pi/180]*len(OR)))
+        ksi = ksi_values
 
-        # Seems like this assumes that OR's first three values are in radians.
-        # This needs to be called out in the function docstring.
+    ksi = [ksi[i] * np.pi / 180 for i in range(3)]
 
-        # Get the misorientation of the OR from the 1st Bain correspondence matrix
-        MB = empty((2, 1), dtype=object) # replaces `MB = cell(2,1)`.
-        MB[1] = zeros([3, 3])
-        MB[1][1,1] = cos(OR[1])
-        MB[1][2,2] = cos(OR[2])
-        MB[1][3,3] = cos(OR[3])
+    # convert ksi radians to rotation matrices
 
-        costh = 0.5 * (np.matrix(MB[1]).trace()-1.0)
-        mosth = 1 - costh
-        sinth = sqrt(1 - costh**2)
+    mb = np.zeros([2, 9])
 
-        r1 = (sqrt( (MB[1](1,1)-costh) / (mosth) ))
-        r2 = (sqrt( (MB[1](2,2)-costh) / (mosth) ))
-        r3 = (sqrt( (MB{1}(3,3)-costh) / (mosth) ))
-        
-        costh = None
-        OR = None
-        
-        r1_r2 = r1*r2*mosth
-        r1_r3 = r1*r3*mosth
-        r2_r3 = r2*r3*mosth
+    mb[0, 0] = np.cos(ksi[0])
+    mb[0, 4] = np.cos(ksi[1])
+    mb[0, 8] = np.cos(ksi[2])
 
-        r3_st = r3*sinth
-        r2_st = r2*sinth
-        r1_st = r1*sinth
+    costh = 0.5 * (np.sum(np.cos(ksi)) - 1.0)  # sum(cos(ksi)) is the matrix trace
+    mosth = 1.0 - costh
+    sinth = np.sqrt(1.0 - costh ** 2.0)
 
-        r1 = None
-        r2 = None
-        r3 = None
-        mosth = None
-        sinth = None
+    r1 = np.sqrt((mb[0, 0] - costh) / mosth)
+    r2 = np.sqrt((mb[0, 4] - costh) / mosth)
+    r3 = np.sqrt((mb[0, 8] - costh) / mosth)
+    del costh
 
-        MB[1][2,3] = r2_r3 - r1_st
-        MB[1][3,2] = r2_r3 + r1+st
-        MB[2] = MB[1]
-        MB[1][1,2] = -1*r1_r2 + r3_st
-        MB[1][1,3] = -1*r1_r3 - r2_st
-        MB[1][2,1] = -1*r1_r2 - r3_st
-        MB[1][3,1]=  -1*r1_r3 + r2_st
-        
-        r1_r2 = None
-        r1_r3 = None
-        r2_r3 = None
+    r1r2 = r1 * r2 * mosth
+    r1r3 = r1 * r3 * mosth
+    r2r3 = r2 * r3 * mosth
+    r3st = r3 * sinth
+    r2st = r2 * sinth
+    r1st = r1 * sinth
+    del r1, r2, r3, mosth, sinth
 
-        r1_st = None
-        r2_st = None
-        r3_st = None
-        
-        MB[2][1,2] = -1*MB[1][1,2]
-        MB[2][1,3] = -1*MB[1][1,3]
-        MB[2][2,1] = -1*MB[1][2,1]
-        MB[2][3,1] = -1*MB[1][3,1]
+    mb[0, 5] = r2r3 - r1st
+    mb[0, 7] = r2r3 + r1st
+    mb[1, :] = mb[0, :]
 
-        # MB{1} is the positive solution; MB{2} is the negative solution.
+    mb[0, 1] = -r1r2 + r3st
+    mb[0, 2] = -r1r3 - r2st
+    mb[0, 3] = -r1r2 - r3st
+    mb[0, 6] = -r1r3 + r2st
+    del r1r2, r1r3, r2r3, r3st, r2st, r1st
 
-        ## Bain correspondence matrices
-        B = []
-        B[1]  = np.matrix(' 1 -1  0; 1  1  0; 0  0  1')
-        B[2]  = np.matrix(' 0  1 -1; 0  1  1; 1  0  0')
-        B[3]  = np.matrix('-1  0  1; 1  0  1; 0  1  0')
-        B[4]  = np.matrix(' 0  1  1; 0 -1  1; 1  0  0')
-        B[5]  = np.matrix('-1 -1  0; 1 -1  0; 0  0  1')
-        B[6]  = np.matrix(' 1  0 -1; 1  0  1; 0 -1  0')
-        B[7]  = np.matrix(' 1  1  0;-1  1  0; 0  0  1')
-        B[8]  = np.matrix('-1  0 -1;-1  0  1; 0  1  0')
-        B[9]  = np.matrix(' 0 -1  1; 0  1  1;-1  0  0')
-        B[10] = np.matrix(' 1  0  1; 1  0 -1; 0  1  0')
-        B[11] = np.matrix(' 0 -1 -1; 0  1 -1; 1  0  0')
-        B[12] = np.matrix('-1  1  0; 1  1  0; 0  0 -1')
-        
-        # Normalize correspondence matrices
-        for i in range(len(B)):
-            for j in range(3):
-                B[i][:,j] = B[i][:,j] / norm( B[i][:,j] )
+    mb[1, 1] = -mb[0, 1]
+    mb[1, 2] = -mb[0, 2]
+    mb[1, 3] = -mb[0, 3]
+    mb[1, 6] = -mb[0, 6]
+    # mb[0] is the 'positive' solution; mb[1] is the 'negative' solution
 
-        ## Produce variants
-        j = 1
-        for i=1:length(B):
-            V[j] = MB[1] * B[i]
-            j += 1
-            V[j] = MB[2] * B[i]
-            j += 1
-        
-        B = None
-        MB = None
+    # create Bain correspondence matrices
+    bb = np.zeros([12, 9])
+    bb[0, :] = [1.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    bb[1, :] = [0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0]
+    bb[2, :] = [-1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+    bb[3, :] = [0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 1.0, 0.0, 0.0]
+    bb[4, :] = [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0, 1.0]
+    bb[5, :] = [1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0]
+    bb[6, :] = [1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    bb[7, :] = [-1.0, 0.0, -1.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+    bb[8, :] = [0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 0.0, 0.0]
+    bb[9, :] = [1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0]
+    bb[10, :] = [0.0, -1.0, -1.0, 0.0, 1.0, -1.0, 1.0, 0.0, 0.0]
+    bb[11, :] = [-1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, -1.0]
 
-        ## Reduce redundancies, if they exist (for example, as in NW)
-        T = R_mat_2_tvec(V)
-        V = None
-        #_, idx = unique(sigdec(T,7),'rows','first')
+    # normalize correspondence matrices
+    # This is a mess, yell at Austin if you need help
+    bb33 = [bb[i].reshape(3, 3) for i in np.arange(12)]
 
-        # T=T(sort(idx),:); % don't allow reordering!
+    bb = [bb33[i] / np.sum(bb33[i] ** 2, axis=0) ** 0.5 for i in np.arange(12)]
 
-        ## Check if results are valid
-        if isreal(T):
-            V = TVec_2_RMat(T)
-        else:
-            V = TVec_2_RMat(T)
-            flag = 1
-            raise Warning('Ksi values produce some imaginary numbers.')
+    mb_new = np.zeros([2, 3, 3])
 
-        varargout = flag
+    mb_new[0] = mb[0].reshape(3, 3)
+    mb_new[1] = mb[1].reshape(3, 3)
 
-        # %% Notes
-        # % For the 'true' KS first variant, we should have:
-        # %T1KS=(1/(6*sqrt(6)))* ...
-        # %    [2*(sqrt(6)+3) -4*sqrt(6) 2*(sqrt(6)-3); ...
-        # %    12-sqrt(6) 2*(sqrt(6)+3) -sqrt(6); ...
-        # %    sqrt(6) -2*(sqrt(6)-3) 12+sqrt(6)];
-        # % On my machine, the above algorithm produces a result with a max round-off
-        # % error of 2.5E-15 for this case.
-        # %
-        # % For the 'true' NW third variant, we should have
-        # %T1KS=(1/(6*sqrt(2)))* ...
-        # %    [0                  6                   -6; ...
-        # %    sqrt(6)*(sqrt(2)-2) sqrt(6)*(sqrt(2)+1) sqrt(6)*(sqrt(2)+1);...
-        # %    sqrt(6)*(sqrt(2)+2) sqrt(6)*(sqrt(2)-1) sqrt(6)*(sqrt(2)-1)];
-        # % On my machine, the above algorithm produces a result with a max round-off
-        # % error of 3.3E-16 for this case.
+    mb = mb_new * 1
 
-        return V, varargout
+    # produce variants
+    vv = np.zeros([24, 3, 3])
+
+    j = 0
+    for i in range(0, len(bb)):
+
+        temp1 = np.dot(mb[0], bb[i])
+        vv[j] = temp1
+
+        j = j + 1
+
+        temp2 = np.dot(mb[1], bb[i])
+        vv[j] = temp2
+
+        j = j + 1
+
+    vv = vv.reshape(24, 9)
+
+    # reduce redundancies, if they exist (as they do, for example, in NW)
+    vv, ia, ic = uniquerows(sigdec(vv, 7))
+    del ia, ic
+
+    vv = vv.reshape(12,3,3)
+
+    return vv
+
+
+def main():
+    ksiKS = [5.26, 10.30, 10.53]
+    ksiNW = [0, 9.74, 9.74]
+
+    yvNW = yardley_variants(ksiNW)
+    yvKS = yardley_variants(ksiKS)
+
+main()

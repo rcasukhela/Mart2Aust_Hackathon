@@ -5,6 +5,7 @@ Created on Fri May 13, 2022
 
 import math
 import numpy
+import numpy as np
 import scipy.special as sc
 
 
@@ -47,7 +48,7 @@ class ODF:
     # ============================ #
     #          Constructor         #
     # ============================ #
-    def __init__(self, f_hat, weights, bandwidth, CS, SS, odfKernel):
+    def __init__(self, f_hat, weights, bandwidth, CS, SS, odfKernel, center):
         """
         :param f_hat:
             # To-Do: Add what this is
@@ -75,6 +76,7 @@ class ODF:
         self.CS = CS
         self.SS = SS
         self.odfKernel = odfKernel
+        self.center = center
 
 
 # ============================ #
@@ -92,50 +94,29 @@ def generate_kernel(halfwidth):
         A Psi Object, the Kernel
     """
 
-    # Calculate Psi values
-    kappa = math.floor((0.5 * math.log(0.5)) / math.log(math.cos(halfwidth / 2)))
-    C = round(sc.beta(1.5, 0.5) / sc.beta(1.5, kappa + 0.5))
-    A = []
-    bandwidth = 90
+    # Calculate kappa and the pre-cos constant
+    kappa = 0.5 * math.log(0.5) / math.log(math.cos(halfwidth / 2))
+    C = sc.beta(1.5, 0.5) / sc.beta(1.5, kappa + 0.5)
 
-    return Psi(kappa, C, A, bandwidth)
+    # Extract the bandwidth as an int
+    L = math.floor(kappa)
 
-
-def calc_odf(orientations, odfKernel):
-    """
-    Calculates the ODF given the orientations and kernel.
-
-    :param orientations: (List of orientations)
-        Note: Add what this is
-
-    :param odfKernel: (Psi Object)
-        Note: Add what this is
-
-    :return:
-        An ODF object
-    """
-
-    L = math.floor(odfKernel.bandwidth)
-
-    # Create and cut the A Array
-    odfKernel.A = numpy.ones((1, L + 1))
-    odfKernel.A = odfKernel.A[0, :]
-
-    # Calculate Chebyshev coefficients
-    odfKernel.A[1] = odfKernel.kappa / (odfKernel.kappa + 2.0)
-
+    # Compute Chebyshev coefficients
+    A = numpy.ones((L + 1,))  # 0 to L
+    A[1] = kappa / (kappa + 2)  # Overwrite second value
     for j in range(1, L):
-        odfKernel.A[j + 1] = ((odfKernel.kappa - j + 1) * odfKernel.A[j - 1] - (2 * j + 1) * odfKernel.A[j]) \
-                             / (odfKernel.kappa + j + 2)
+        A[j + 1] = ((kappa - j + 1) * A[j - 1] - (2 * j + 1) * A[j]) \
+                   / (kappa + j + 2)
 
     for i in range(0, L):
-        odfKernel.A[i] = (2 * i + 1) * odfKernel.A[i]
+        A[i] = (2 * i + 1) * A[i]
 
-    # Cut off Chebyshev coefficients when the values are small
-    odfKernel.A = cut(odfKernel.A)
+    A = cut(A)
 
-    # Return the ODF object
-    return ODF(0, 0, 0, 0, 0, odfKernel)
+    # Set the bandwidth per length of A
+    bandwidth = A.size - 1
+
+    return Psi(kappa, C, A, bandwidth)
 
 
 def cut(A):
@@ -150,27 +131,28 @@ def cut(A):
     """
 
     # Epsilon value denoting the cutoff point for Chebyshev values
-    epsilon = 0.0100
-    returnA = []
+    epsilon = 0.0100 / 150
 
-    # Loop through the array and add the large values
-    for i in range(-1, len(A) - 1):
-        if A[i] > epsilon:
-            returnA.append(round(A[i], 4))
+    returnA = A / numpy.arange(1, A.size + 1) ** 2
+    ind = numpy.argwhere(returnA[1:] <= numpy.maximum(numpy.amin(
+        numpy.append(returnA[1:], 10 * epsilon)), epsilon))[0]
 
+    returnA = A[:numpy.minimum(int(ind + 1), A.size - 1) + 1]  # Added a +1 here!
     # Return the smaller list of Chebyshev coefficients
     return returnA
 
 
+def eval_kernel_odf(odf, g):
+    w = g - odf.center
+    v = odf.psi.C * np.pow(math.cos(w / 2), odf.psi.kappa)
+
+    return v
+
+
 def main():
-
-    odfKernel = generate_kernel(0.1745)
-    odfObject = calc_odf([], odfKernel)
-    print(odfObject.odfKernel.A)
-
-    odfKernel2 = generate_kernel(0.34634)
-    odfObject2 = calc_odf([], odfKernel2)
-    print(odfObject2.odfKernel.A)
+    odfKernel = generate_kernel(0.04360)
+    print(odfKernel.A)
+    return odfKernel
 
 
-main()
+kernel = main()

@@ -8,6 +8,9 @@ import numpy
 import numpy as np
 import scipy.special as sc
 
+import orix.quaternion
+from orix.quaternion import Misorientation
+
 
 class Psi:
     """
@@ -143,15 +146,66 @@ def cut(A):
 
 
 def eval_kernel_odf(odf, g):
-    w = g - odf.center
-    v = odf.psi.C * np.pow(math.cos(w / 2), odf.psi.kappa)
+
+    arr1 = [g.a[0], g.b[0], g.c[0], g.d[0]]
+    arr2 = [odf.center.a[0], odf.center.b[0], odf.center.c[0], odf.center.d[0]]
+
+    print(arr1)
+    print(arr2)
+
+    w = Misorientation(np.array([arr1, arr2]))
+
+    w = w.get_distance_matrix()
+
+    print(math.degrees(numpy.amax(w)))
+
+    angle = 2 * math.acos(numpy.amax(w))
+
+    print(angle)
+
+    base = math.cos(angle / 2)
+
+    power = odf.odfKernel.kappa
+
+    print(base)
+
+    print(power)
+
+    print(odf.odfKernel.C)
+
+    v = odf.odfKernel.C * np.power(base, power)
+
+    print(v)
 
     return v
 
 
 def main():
     odfKernel = generate_kernel(0.04360)
-    print(odfKernel.A)
+
+    SS = orix.quaternion.Symmetry([1, 0, 0, 0])
+    CS = orix.quaternion.symmetry.get_point_group(225)
+
+    rad1 = math.radians(107.028)
+    rad2 = math.radians(43.8449)
+    rad3 = math.radians(260.18)
+
+    data = [rad1, rad2, rad3]
+    center = orix.quaternion.Orientation.from_euler(data, CS)
+
+
+    odf = ODF([], [], [], [], [], odfKernel, center)
+
+    rad4 = math.radians(106)
+    rad5 = math.radians(42)
+    rad6 = math.radians(259)
+
+    ori = [rad4, rad5, rad6]
+
+    oriPrime = orix.quaternion.Orientation.from_euler(ori, CS)
+
+    v = eval_kernel_odf(odf, oriPrime)
+
     return odfKernel
 
 

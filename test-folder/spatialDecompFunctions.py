@@ -164,27 +164,60 @@ def generateUnitCells(xy, unitCell):
     plt.show
     '''
     import numpy as np
-    
-    # compute the vertices
-    x = np.reshape(np.tile(np.atleast_2d(xy[:,0]).T, [1, np.shape(unitCell[:,0])[0]]) + np.tile(unitCell[:,0],[np.shape(xy[:,0])[0],1]), [1,-1])
-    y = np.reshape(np.tile(np.atleast_2d(xy[:,1]).T, [1, np.shape(unitCell[:,1])[0]]) + np.tile(unitCell[:,1],[np.shape(xy[:,1])[0],1]), [1,-1])
-    
+    from orix.utilities.utilities import sortrows
+    from orix.utilities import utilities
+
+    xy = X
+    unitCell = unit_cell
+
+    def clockwise_sort(points_list):
+        import math
+
+        def angle_to(point):
+        # assumes already mapped to (0,0) center
+        # modify as needed to get result in desired range
+            return math.atan2(point[1],point[0])
+
+        sorted_points = sorted(points_list, key=angle_to, reverse=True)
+        sorted_points = np.roll(sorted_points, 1, axis=0)
+
+        return sorted_points
+
+    unitCell = clockwise_sort(unitCell)
+
+    # add unitCell values to data.
+    def add_unitcell_values(X):
+        X_new = []
+        for elem1 in unitCell:
+            for elem2 in X:
+                X_new.append(list(elem1+elem2))
+
+        X_new = np.array(X_new)
+        return X_new
+        
+    X_new = add_unitcell_values(X)
+
+    x = X_new[:, 0]
+    y = X_new[:, 1]
+    #X_new = None
+
     # remove equal points
     eps = np.amin([np.sqrt(np.diff(unitCell[:,0])**2 + np.diff(unitCell[:,1])**2)])/10.;
-    
+
     verts = np.squeeze(np.round([x - np.amin(x), y - np.amin(y)]/eps)).T
-    
-    from orix.utilities import utilities
-    v, m, n = utilities.uniquerows(verts);
-    
+
+    v, m, n = utilities.uniquerows(verts)
+    v, order = sortrows(v, return_order=True)
+
     x = np.squeeze(x)
     y = np.squeeze(y)
     m = np.squeeze(m)
-    
-    v = np.vstack([x[m], y[m]]).T
-    
+
+
+    v = np.vstack([x[m][order], y[m][order]]).T
+
     # set faces
-    faces = np.reshape(n, [-1,np.size(unitCell[:,1])]);
+    faces = np.reshape(order[n], [-1,np.size(unitCell[:,1])])
     
     return v, faces
 

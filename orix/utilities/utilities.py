@@ -812,7 +812,7 @@ def uniquerows(aa):
 
 #------------------------------------------------------------------------------
 
-def sortrows(a):
+def sortrows(a, return_order = False):
     '''
     sorts an array by rows
     
@@ -821,8 +821,12 @@ def sortrows(a):
     Mimics the behavior of matlab's function of the same name.
     '''
     import numpy as np
-    order = np.lexsort(np.fliplr(a).T)
-    return a[order]
+    if not return_order:
+        order = np.lexsort(np.fliplr(a).T)
+        return a[order]
+    else:
+        order = np.lexsort(np.fliplr(a).T)
+        return a[order], order
 
 #------------------------------------------------------------------------------
 

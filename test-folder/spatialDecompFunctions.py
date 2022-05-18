@@ -14,7 +14,7 @@ def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     # the inputs are: quaternion(ebsd.rotations),ebsd.CSList{p},Dl(ndx),Dr(ndx),gbcValue(p),varargin{:})
 
     
-    #%% FOR TESTING
+    #% FOR TESTING
     ################## load materials and image 
     # this whole section will be replaced by graph cut function eventually
     path = r'/Users/paytone/Documents/GitHub/maxflow_for_matsci/Data/steel_ebsd.ang'
@@ -111,8 +111,9 @@ def householderMatrix(v):
 
     '''
     import numpy as np
+    # H = @(v) eye(3) - 2./(v(:)'*v(:))*(v(:)*v(:)') ;
     v = np.atleast_2d(v).T
-    H = np.eye(3) - 2. / np.matmul(v.T, v) * np.matmul(v, v.T)
+    H = np.eye(3) - 2. / (np.matmul(v.T, v) * np.matmul(v, v.T))
     return H
 
 def translationMatrix(s):

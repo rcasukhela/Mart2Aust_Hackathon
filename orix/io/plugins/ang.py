@@ -351,11 +351,14 @@ def _get_phases_from_header(header):
         n_left = n_phases - len(phase_ids)
         phase_ids += [i for i in range(next_id, next_id + n_left)]
 
-    # If phases["point_group"] is a number, assume symmetry to be space group and convert to point group international
-    # notation
-    point_group_names = ['1', '-1', '2', 'm', '2/m', '222', 'mm2', 'mmm', '4', '-4', '4/m', '422', '4mm', '42m',
-                         '4/mmm', '3', '-3', '32', '3m', '-3m', '6', '-6', '6/m', '622', '6mm', '-6m2', '6/mmm', '23',
-                         'm-3', '432', '-43m', 'm-3m']
+    # If phases["point_group"] is a number, assume symmetry to be space group
+    #and convert to point group international notation
+    point_group_names = ['1', '-1', '2', 'm', '2/m', '222', 'mm2', 'mmm', '4',
+                         '-4', '4/m', '422', '4mm', '42m', '4/mmm', '3', '-3',
+                         '32', '3m', '-3m', '6', '-6', '6/m', '622', '6mm',
+                         '-6m2', '6/mmm', '23', '43', 'm-3', '432', '-43m',
+                         'm-3m'
+                         ]
     for i, phase in enumerate(phases["point_group"]):
         if phase.isdigit() and phase not in point_group_names:
             space_group = int(phase)

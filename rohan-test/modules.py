@@ -143,7 +143,6 @@ def namedOR(name):
             ksi0 = np.arccos((s2 + 1.0) / s6)
             ksi = np.array([0.0, ksi0, ksi0])
         elif name.lower() == 'bain':
-
             ksi = np.array([0.0, 0.0, 0.0])
         else:
             print('namedOR: Unrecognized named OR')
@@ -298,9 +297,12 @@ def yardley_variants(ksi_values):
 
     # reduce redundancies, if they exist (as they do, for example, in NW)
     vv, ia, ic = uniquerows(sigdec(vv, 7))
-    del ia, ic
 
-    vv = vv.reshape(12,3,3)
+    print(vv.shape)
+
+    num = int(vv.size / vv[0].size)
+
+    vv = vv.reshape(num,3,3)
 
     return vv
 
@@ -309,7 +311,7 @@ def main():
     ksiKS = [5.26, 10.30, 10.53]
     ksiNW = [0, 9.74, 9.74]
 
-    yvNW = yardley_variants(ksiNW)
     yvKS = yardley_variants(ksiKS)
+    tvNW = yardley_variants(ksiNW)
 
 main()

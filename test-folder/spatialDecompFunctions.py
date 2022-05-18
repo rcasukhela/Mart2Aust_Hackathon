@@ -112,7 +112,7 @@ def householderMatrix(v):
     '''
     import numpy as np
     v = np.atleast_2d(v).T
-    H = np.eye(3) - 2. / np.matmul(v.T, v) * np.matmul(v, v.T)
+    H = np.eye(3) - 2. / np.matmul(np.matmul(v.T, v), np.matmul(v, v.T))
     return H
 
 def translationMatrix(s):

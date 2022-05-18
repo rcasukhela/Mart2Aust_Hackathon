@@ -1,20 +1,8 @@
-import operator
-
-import numpy
-from numpy import sqrt
-from numpy import empty, zeros
-from numpy.linalg import norm
-from math import acos, cos
-from math import pi
-
 import numpy as np
 
-from scipy.spatial.transform import Rotation as R
 
-
-def vecarrayconvert(a):  # FIXME: Not necessary? Can just use asanyarray?
-    ''' convert any reasonable datatype into an n x 3 vector array'''
-    import numpy as np
+def vecarrayconvert(a):
+    """ convert any reasonable datatype into an n x 3 vector array"""
 
     # a = np.asanyarray(a)
 
@@ -33,8 +21,7 @@ def vecarrayconvert(a):  # FIXME: Not necessary? Can just use asanyarray?
 def vecarraynorm(a):
     nrm = []
 
-    ''' norm of an array of vectors '''
-    import numpy as np
+    """ norm of an array of vectors """
     ax = vecarrayconvert(a[0])
     ay = vecarrayconvert(a[1])
     az = vecarrayconvert(a[2])
@@ -48,7 +35,7 @@ def vecarraynorm(a):
 
 
 def uniquerows(aa):
-    ''' returns the number of unique rows in an array.
+    """ returns the number of unique rows in an array.
 
     Parameters
     ----------
@@ -71,8 +58,7 @@ def uniquerows(aa):
     References
     ---------
     .. [1] http://stackoverflow.com/questions/8560440/, Accessed 2012-09-10
-    '''
-    import numpy as np
+    """
 
     ind = np.lexsort(np.fliplr(aa).T)  # indices for aa sorted by rows
     rev = np.argsort(ind)  # reverse of the sorting indices
@@ -96,11 +82,10 @@ def uniquerows(aa):
 
 
 def sigdec(a, n=1):
-    '''
+    """
     Rounds the elements of a to n decimals.
     A slight modification of Peter J. Acklam's Matlab function FIXDIG
-    '''
-    import numpy as np
+    """
     a = vecarrayconvert(a)
     n = vecarrayconvert(n)
     f = np.array(10. ** n)
@@ -124,10 +109,9 @@ def namedOR(name):
 
     Notes
     -----
-    TODO: Add plane parallel Greninger-Troiano, Kelly, etc.
-    TODO: Allow 'Kurdjumov-Sachs' as well as 'ks', etc.
     """
-    import numpy as np
+
+    ksi = []
     if isinstance(name, str):
         if name.lower() == 'ks':
             s6 = np.sqrt(6.0)
@@ -154,7 +138,7 @@ def namedOR(name):
 
 
 def yardley_variants(ksi_values):
-    '''
+    """
     YardleyVariants returns the matrices corresponding to the variants
                     produced from the provided orientation relationship,
                     specified in Kurjumov-Sachs angles.
@@ -184,7 +168,7 @@ def yardley_variants(ksi_values):
     from numpy.linalg import norm
     from math import acos, cos
     from math import pi
-    '''
+    """
     """ Generate variants from Kurdjumov-Sachs angles
 
     Returns matrices of an orientation relationship specified in Kurjumov-Sachs
@@ -201,22 +185,22 @@ def yardley_variants(ksi_values):
 
     """
 
+    # Parse input orientation relationship
     if isinstance(ksi_values, str):
         ksi = namedOR(ksi_values)
     else:
         ksi = ksi_values
 
+    # Convert KSI_values specification into radians
     ksi = [ksi[i] * np.pi / 180 for i in range(3)]
 
-    # convert ksi radians to rotation matrices
-
+    # Get the misorientation of the ksi_values from the 1st Bain correspondence matrix
     mb = np.zeros([2, 9])
-
     mb[0, 0] = np.cos(ksi[0])
     mb[0, 4] = np.cos(ksi[1])
     mb[0, 8] = np.cos(ksi[2])
 
-    costh = 0.5 * (np.sum(np.cos(ksi)) - 1.0)  # sum(cos(ksi)) is the matrix trace
+    costh = 0.5 * (np.sum(np.cos(ksi)) - 1.0)
     mosth = 1.0 - costh
     sinth = np.sqrt(1.0 - costh ** 2.0)
 
@@ -247,6 +231,7 @@ def yardley_variants(ksi_values):
     mb[1, 2] = -mb[0, 2]
     mb[1, 3] = -mb[0, 3]
     mb[1, 6] = -mb[0, 6]
+
     # mb[0] is the 'positive' solution; mb[1] is the 'negative' solution
 
     # create Bain correspondence matrices
@@ -265,24 +250,17 @@ def yardley_variants(ksi_values):
     bb[11, :] = [-1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, -1.0]
 
     # normalize correspondence matrices
-    # This is a mess, yell at Austin if you need help
     bb33 = [bb[i].reshape(3, 3) for i in np.arange(12)]
-
     bb = [bb33[i] / np.sum(bb33[i] ** 2, axis=0) ** 0.5 for i in np.arange(12)]
-
     mb_new = np.zeros([2, 3, 3])
-
     mb_new[0] = mb[0].reshape(3, 3)
     mb_new[1] = mb[1].reshape(3, 3)
-
     mb = mb_new * 1
 
-    # produce variants
+    # Produce Variants
     vv = np.zeros([24, 3, 3])
-
     j = 0
     for i in range(0, len(bb)):
-
         temp1 = np.dot(mb[0], bb[i])
         vv[j] = temp1
 
@@ -293,25 +271,14 @@ def yardley_variants(ksi_values):
 
         j = j + 1
 
+    # Reshape the matrix to allow for redundancy reduction
     vv = vv.reshape(24, 9)
 
-    # reduce redundancies, if they exist (as they do, for example, in NW)
+    # Reduce redundancies, if they exist (as they do, for example, in NW)
     vv, ia, ic = uniquerows(sigdec(vv, 7))
 
-    print(vv.shape)
-
+    # Reshape the matrix back into a set of 3x3's
     num = int(vv.size / vv[0].size)
-
-    vv = vv.reshape(num,3,3)
+    vv = vv.reshape(num, 3, 3)
 
     return vv
-
-
-def main():
-    ksiKS = [5.26, 10.30, 10.53]
-    ksiNW = [0, 9.74, 9.74]
-
-    yvKS = yardley_variants(ksiKS)
-    tvNW = yardley_variants(ksiNW)
-
-main()

@@ -113,12 +113,11 @@ def generate_kernel(halfwidth):
         A[i] = (2 * i + 1) * A[i]
     
     # Cut off Chebyshev coefficients when the values are small
-    A = cut(A)
-    
-    # Set the bandwidth per length of A
-    bandwidth = A.size - 1 
-    
-    return Psi(kappa, C, A, bandwidth)
+    odfKernel.A = cut(odfKernel.A)
+
+    # Return the ODF object
+    return ODF(0, 0, 0, 0, 0, odfKernel, 0)
+
 
 def cut(A):
     """
@@ -149,6 +148,14 @@ def eval_kernel_odf(odf, g):
     v = odf.psi.C * np.pow(math.cos(w/2), odf.psi.kappa)
 
     return v
+
+def eval_kernel_odf(odf, g):
+
+    w = g-odf.center
+    v = odf.psi.C * np.pow(math.cos(w/2), odf.psi.kappa)
+
+    return v
+
 
 def main():
 

@@ -5,6 +5,57 @@ Created on Mon May 16 12:00:47 2022
 
 @author: paytone
 """
+import numpy as np
+from scipy import sparse
+
+
+
+def basic_spatial_decomp(xmap, unit_cell=None):
+    """
+    converts a crystal map into a series of cells (D) with vertices (V),
+    where every cell correlates with a single pixel, and forms a convex hull
+    surrounding the voronoi area around each voxel in the crystal map.
+
+    Parameters
+    ----------
+    xmap: orix.xmap object
+        the 2D or 3D ebsd map of orientation and phase data
+
+    unit_cell: None or Voronoi
+        If 'None', will calculate the expected cells and vertexes assuming a
+        repeating rectangular grid. (hex is currently unsupported)
+        If 'Voronoi', will calculate V and D using qhull's voronoi tesselation
+
+    Returns
+    -------
+    V:
+        n x m numpy array of vertex coordinates
+    D:
+        4 x m numpy array of vertex indicies that form D. the coordinates of
+        the vertexes of D can be found as V[D,:], or the Vertexes of the xth
+        entry in D as V[D[x],:]
+    """
+    if unit_cell is not None:
+        raise NotImplemented("bingus bongus")
+    xx, yy = np.meshgrid(
+        np.arange(xmap.shape[1] + 1)*xmap.dx - xmap.dx/2,
+        np.arange(xmap.shape[0] + 1)*xmap.dy - xmap.dy/2
+        )
+    V = np.vstack([xx.flatten(), yy.flatten()]).T
+    N = np.arange(xx.size).reshape(xx.shape)
+    D = np.vstack([
+        N[:-1, :-1].flatten(),
+        N[:-1, 1:].flatten(),
+        N[1:, :-1].flatten(),
+        N[1:, 1:].flatten()
+        ]).T
+    big_F = np.vstack([D[:, (0, 1)], D[:, (0, 2)], D[:, (1, 3)], D[:, (2, 3)]])
+    F, ie = np.unique(big_F, axis=0, return_inverse=True)
+    F_ID = sparse.coo_matrix(
+        (ie*0 + 1, (np.arange(xmap.size).repeat(4), ie)),
+        shape=(xmap.size, F.size)
+        )
+    return(V, D, F_ID)
 
 def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     '''

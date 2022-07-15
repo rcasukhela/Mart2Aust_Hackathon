@@ -18,29 +18,18 @@
 
 import pytest
 
-from ....reconstruction.modules import yardley_variants
+from reconstruction.modules import yardley_variants
 
 import numpy as np
 from math import sin, cos
-import scipy.spatial.transform.Rotation as R
-
-@pytest.fixture
-def rotation_product(ksi, string='xyz'):
-    '''
-    Test assumes ksi values from V.A. Yardley & E.J. Payton: 'Austenite– \
-        martensite/bainite orientation relationship: characterisation \
-        parameters and their application'
-    '''
-    
-    product = R.from_euler(string,ksi[0],ksi[1],ksi[2]).as_matrix()
-
-    return product
+from  scipy.spatial.transform import Rotation as R
 
 
 def test_yardley_variants():
     ksi = [5.5, 5.0, 10.5]
-    
-    bs_test = rotation_product(ksi)
-    yv_test = modules.yardley_variants(ksi)
 
-    assert bs_test == yv_test[1,:].reshape(3,3)
+    yv_test = yardley_variants(ksi)
+    
+    extreme_values_matrix = None
+    
+    assert yv_test[0] == extreme_values_matrix

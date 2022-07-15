@@ -55,7 +55,7 @@ def basic_spatial_decomp(xmap, unit_cell=None):
         (ie*0 + 1, (np.arange(xmap.size).repeat(4), ie)),
         shape=(xmap.size, F.size)
         )
-    return(V, D, F_ID)
+    return(V, F, D, F_ID)
 
 
 def erase_linearly_dependent_points(points):

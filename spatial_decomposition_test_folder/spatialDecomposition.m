@@ -132,8 +132,7 @@ radius = mean(sqrt(sum(unitCell.^2,2)));
 edgeLength = sqrt(sum(diff(boundingX).^2,2));
 
 % fill each line segment with nodes every 20 points (in average)
-nto = fix((edgeLength>0)*4); 
-fix(edgeLength*(2*radius));
+nto = fix((edgeLength>0)*4); fix(edgeLength*(2*radius));
 
 assignin('base','nto_test',nto)
 cs = cumsum([1; 1 + nto]);

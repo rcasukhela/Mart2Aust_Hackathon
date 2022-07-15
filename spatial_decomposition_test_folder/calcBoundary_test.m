@@ -7,7 +7,6 @@ dummyCoordinates = [];
 
 % specify a bounding polyogn
 method = get_option(varargin,'boundary','hull',{'char','double'});
-method = 'tight'
 
 if ischar(method)
   
@@ -129,6 +128,9 @@ for k=1:size(boundingX,1)-1
             
     tmpX = tmpX( ~(right | left) ,:);
      
+    size(tmpX,1)
+    edgeLength(k)/size(tmpX,1)
+    
     if edgeLength(k)/size(tmpX,1) < radius/3
       break;
     elseif m < 2^7

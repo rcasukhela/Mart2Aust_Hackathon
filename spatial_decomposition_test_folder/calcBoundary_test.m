@@ -125,6 +125,8 @@ for k=1:size(boundingX,1)-1
     right = (bsxfun(@minus, tmpX, boundingX(k,1:2)  - intendX ) * edgeDirection(k,1:2)') < 0;
     left  = (bsxfun(@minus, tmpX, boundingX(k+1,1:2)+ intendX ) * edgeDirection(k,1:2)') > 0;
    
+    right = np.matmul(tmp_X - np.tile( bounding_X[k, 0:2]   - intend_X, [np.shape(tmp_X)[0], 1]), edge_direction[k, 0:2].T) < 0
+            
     tmpX = tmpX( ~(right | left) ,:);
      
     if edgeLength(k)/size(tmpX,1) < radius/3

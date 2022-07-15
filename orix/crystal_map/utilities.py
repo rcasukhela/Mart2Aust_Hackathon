@@ -618,3 +618,151 @@ def generateUnitCells(xy, unitCell):
     
     return v, faces
 
+def calcUnitCell(xy, *args):
+    '''
+    Compute the unit cell for an EBSD data set
+    '''
+    
+    import numpy as np
+    from scipy.spatial import Voronoi
+    
+    # isempty return
+    ## NOT WRITTEN
+    
+    # Check if the input xy is 3-col data and do some recursion
+    ## NOT WRITTEN
+    
+    # Make the first estimate of the grid resolution
+    area = (np.max(xy[:,0])-np.min(xy[:,0]))*(np.max(xy[:,1])-np.min(xy[:,1]))
+    dxy = np.sqrt(area / np.max(xy.shape))
+    
+    # Compensate for the single line EBSD
+    ## NOT WRITTEN
+    
+    # Remove the duplicates from the coords
+    tol = 0.010 / np.sqrt(xy.shape[0])
+    xy = np.unique(xy.round(decimals=6), axis=0) # Need better solution here for uniquetol
+    # see https://stackoverflow.com/questions/46101271/what-does-uniquetol-do-exactly
+    
+    # Reduce the data set
+    if (np.max(xy.shape) > 10000):
+        xy = subSample(xy, 10000)
+    
+    # Wrap the Voronoi decomp in a try/catch
+    try:
+        vor = Voronoi(xy, qhull_options='Qz')
+        V = vor.vertices
+        D = vor.regions
+
+        # Some notes here: Our V omits the [inf inf] first cell that MATLAB returns
+        # but our D does contain the first dead cell that MATLAB omits
+
+        # Try the sorting thing from:
+        # https://stackoverflow.com/questions/59090443/how-to-get-the-same-output-of-voronoin-of-matlab-by-scipy-spatial-voronoi-of-pyt
+
+        # Find point coordinate for each region
+        sorting = [np.where(vor.point_region==x)[0][0] for x in range(1, len(D))]
+        # sort regions along coordinate list `sorting` (exclude first, empty list [])
+        sorted_regions = [x for _, x in sorted(zip(sorting, D[1:]))]
+        # The above command gives us parity with MATLAB's voronoin
+        # but the IDs of the vertices aren't necessarily the same
+
+        # Compute the area of each Voronoi cell
+        areaf = np.zeros((np.max(xy.shape)))
+        for i, indices in enumerate(sorted_regions):
+
+            # Skip this calculation if open cell
+            if -1 in np.array(indices):
+                areaf[i] = np.nan          
+                continue
+
+            # Retrieve the vertices in this Voronoi cell
+            # and compute the area with a shoelace formula
+            r_verts = np.vstack([V[indices,:], V[indices[0],:]])
+            areaf[i] = polyArea(r_verts[:,0],r_verts[:,1])
+
+        # Now, find the "unit cell" which is the Voronoi cell with the 
+        # smallest area. If there are duplicates, grab the first.
+        ci = int(np.argwhere(areaf==np.nanmin(areaf))[0])
+
+        # Get the vertices of the "unit cell"
+        unitCell = np.array([V[sorted_regions[ci],0] - xy[ci,0], \
+                             V[sorted_regions[ci],1] - xy[ci,1]]).transpose()
+
+        # Ignore some points given the grid resolution value
+        # It would be helpful is "ignore" was returned as a tuple instead of 2d array
+        ignore = np.hstack([np.zeros((1, 1), dtype=bool), [np.sum(np.power(matlabdiff(unitCell),2), axis=1) < dxy/100]])
+        unitCell = unitCell[~ignore[0,:],:] # Inversion here since Python deletes False
+
+        # Check if this is a regular polygon
+        if (isRegularPoly(unitCell)):      # Missing varargin here
+            return unitCell
+
+    except:
+        pass
+
+    ## EVERYTHING BELOW HERE IS IF THE VORONOI UNITCELL DOESNT 
+    ## END UP CREATING A REGULAR POLYGON UNITCELL
+    ## Please code me :)
+    
+    # Get the second estimate of the grid resolution ?
+    ## NOT WRITTEN YET
+    
+    # Get some grid options
+    ## NOT WRITTEN YET - REQUIRES VARARGIN
+    
+    # Otherwise, do some handling to return a regular unit cell
+    # if the previous Voronoi decomp did not
+    ## NOT WRITTEN YET - REQUIRES regularPoly to be ported
+    
+    # return unitCell
+    
+def subSample(xy, N):
+    '''
+    Find a square subset of about N points
+    '''
+    import numpy as np
+    
+    xminmax = np.vstack([np.min(xy[:,0]), np.max(xy[:,0])])
+    yminmax = np.vstack([np.min(xy[:,1]), np.max(xy[:,1])])
+
+    while (np.max(xy.shape) > N):
+        
+        if (matlabdiff(xminmax) > matlabdiff(yminmax)):
+            xminmax = np.divide(np.matmul(np.array([[3, 1], [1, 3]]), xminmax), 4)
+        else:
+            yminmax = np.divide(np.matmul(np.array([[3, 1], [1, 3]]), yminmax), 4)
+        
+        log_a = np.logical_and(xy[:,0] > xminmax[0], (xy[:,0] < xminmax[1]))
+        log_b = np.logical_and(xy[:,1] > yminmax[0], (xy[:,1] < yminmax[1]))
+        log_ab = np.logical_and(log_a, log_b)
+        
+        xy = xy[log_ab, :]
+
+    return xy    
+        
+def polyArea(x,y):
+    return 0.50*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
+
+def isRegularPoly(unitCell):
+    
+    import numpy as np
+    
+    # Compute the side lengths of all the "edges"
+    sideLength = np.sqrt(np.sum(np.power(unitCell,2), axis=1))
+    sides = sideLength.size
+    
+    # Some complex conversions and a roll
+    uC = unitCell[:,0] + unitCell[:,1] * 1.0j
+    nC = np.roll(uC, -1, axis=0)
+    
+    # Determine the angles between the edges
+    enclosingAngle = np.divide(uC, nC)
+    enclosingAngle = np.abs(np.real(enclosingAngle)) + \
+                     np.abs(np.imag(enclosingAngle)) * 1.0j
+
+    # If it is extremely close to a square or hex, we are good to return
+    isRegular = (np.any(sides==np.array([4, 6]))) and \
+                (np.linalg.norm(enclosingAngle - np.mean(enclosingAngle)) < np.deg2rad(0.05))
+    
+    return isRegular

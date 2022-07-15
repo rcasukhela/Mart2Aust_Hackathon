@@ -59,7 +59,7 @@ X = [ebsd.prop.x(:), ebsd.prop.y(:)];
 dummyCoordinates = [];
 
 % specify a bounding polyogn
-method = 'hull';
+method = 'tight';
 
 if ischar(method)
   

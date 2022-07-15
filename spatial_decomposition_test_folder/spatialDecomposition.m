@@ -208,7 +208,7 @@ for k=1:size(boundingX,1)-1
   
 end
   
-dummyCoordinates = unique(dummyCoordinates,'first','rows');
+[dummyCoordinates, ia, ic] = uniquetol(dummyCoordinates,1e-12,'ByRows',true);
 
 % remove those points which are inside the b
 

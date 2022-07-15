@@ -300,6 +300,40 @@ class CrystalMap:
             return phase_list
 
     @property
+    def unit_cell(self, xy_grid='square'):
+        if xy_grid == 'square':
+            corners = np.array([[-1, 1, 1],
+                                [1, 1, 1],
+                                [1, -1, 1],
+                                [-1, -1, 1],
+                                [-1, 1, -1],
+                                [1, 1, -1],
+                                [1, -1, -1],
+                                [-1, -1, -1]]) * 0.5
+        elif xy_grid == 'hex_xy':
+            s = 1/np.sqrt(3)
+            h = s*2
+            corners = np.array([[-1, s, 1],
+                                [0, h, 1],
+                                [1, s, 1],
+                                [1, -s, 1],
+                                [0, -h, 1],
+                                [-1, -s, 1],
+                                [-1, s, -1],
+                                [0, h, -1],
+                                [1, s, -1],
+                                [1, -s, -1],
+                                [0, -h, -1],
+                                [-1, -s, -1]
+                                ])*0.5
+        else:
+            raise NotImplemented("currently only supports rectilinear and hex")
+        unit_cell = np.array([self.dx, self.dy, self.dz])*corners
+        if self.dz == 0:
+            unit_cell = unit_cell[:int(len(unit_cell)/2)]
+        return(np.array([self.dx, self.dy])*corners)
+
+    @property
     def rotations(self):
         """Rotations in data."""
         return self._rotations[self.is_in_data]

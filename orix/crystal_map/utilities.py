@@ -5,8 +5,9 @@ Created on Fri Jul 15 09:08:49 2022
 
 @author: paytone
 """
+import numpy as np
 
-def spatial_decomposition(X, unit_cell, *args):
+def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 Qs'):
     '''
     % decomposite the spatial domain into cells D with vertices V,
     %
@@ -20,35 +21,30 @@ def spatial_decomposition(X, unit_cell, *args):
     % D   - cell array of Vornoi cells with centers X_D ordered accordingly
     '''
     # Imports
-    import getopt
-    from numpy import cumsum, zeros, unique, sort
-    from spatialDecompFunctions import generateUnitCells
+    from numpy import zeros
     from scipy.spatial import Voronoi
-    from scipy.sparse import csr_matrix, coo_array
+    from scipy.sparse import csr_matrix
     from orix.utilities.utilities import uniquerows
 
     if unit_cell.all() == None:
         unit_cell = calcUnitCell(X)
+        
+    # compute the vertices
+    [V, faces] = generateUnitCells(X, unit_cell)
+    # NOTE: V and faces do not give exact values as compared to the MATLAB
+    # implementation. However, Eric and Rohan have confirmed that V and faces
+    # at least have the same shape as the MATLAB implementation.
 
-    if args[0] == 'unit_cell':
+    D = np.empty(len(X),dtype=object)
 
-        # compute the vertices
-        [V, faces] = generateUnitCells(X, unit_cell, args[:])
-        # NOTE: V and faces do not give exact values as compared to the MATLAB
-        # implementation. However, Eric and Rohan have confirmed that V and faces
-        # at least have the same shape as the MATLAB implementation.
-
-        D = np.empty(len(X),dtype=object)
-
-        for k in range(X.shape[0]):
-            D[k] = faces[k, :]
+    for k in range(X.shape[0]):
+        D[k] = faces[k, :]
 
     else:    
-        var_arg_in = args[0]
-        dummy_coordinates = calcBoundary(X, unit_cell, var_arg_in)
+        dummy_coordinates = calcBoundary(X, unit_cell, boundary)
 
         vor = Voronoi(np.vstack([X, dummy_coordinates]), 
-                        qhull_options = 'Q5 Q6 Qs') #,'QbB'
+                        qhull_options = qhull_opts) #,'QbB'
 
         V = vor.vertices
         D = vor.regions
@@ -97,7 +93,7 @@ def spatial_decomposition(X, unit_cell, *args):
 
     return V, F, I_FD
 
-def calcBoundary(X, unit_cell, var_arg_in='hull'):
+def calcBoundary(X, unit_cell, boundary='hull'):
     '''
     dummy coordinates so that the voronoi-cells of X are finite
 
@@ -135,13 +131,10 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
     from orix.quaternion.rotation import Rotation
     import orix.vector as vect
     from orix.utilities.utilities import uniquerows
+    import alphashape
+    from matplotlib import path
     
-    from spatialDecompFunctions import householderMatrix, translationMatrix#, erase_linearly_dependent_points
-
     dummy_coordinates = []
-
-    boundary = 'hull'
-    boundary = str(var_arg_in)
 
     if boundary.isalpha():
         
@@ -165,7 +158,10 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
         elif (boundary.lower() == 'hull' or
             boundary.lower() == 'convexhull'):
             
-            bounding_X  = erase_linearly_dependent_points(X)
+            k = ConvexHull(X)
+            k2 = k.vertices
+            
+            bounding_X  = erase_linearly_dependent_points(X, k2)
             
             #Testing
             #import matplotlib.pyplot as plt
@@ -186,7 +182,7 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
 
         else:
             raise ValueError('Unknown boundary type. Available options are \
-            ''hull'', ''convexhull'' and ''cube''.')
+            ''tight'',''hull'', ''convexhull'' and ''cube''.')
 
     elif isinstance(boundary, float):
         bounding_X = boundary
@@ -246,16 +242,6 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
             )
         )
 
-        '''
-        NOTE FROM ERIC AND ROHAN: We are having problems with getting the proper
-        dummy_coordinates. The bounding box only has 2 of 4 lines, we believe
-        this is where the problem is. MATLAB is doing bizarre things with the
-        element-wise division!!!!! We need to contact somebody about this behavior.
-        Python is doing what we expect but it's not the right answer.
-        
-        UPDATE FROM ERIC: Changing the order of operations in Python gives the same result as Matlab.
-        '''
-
         # distance between original and mirrored point
         dist = np.sqrt(np.sum((X[:,0:-1]-p_X[:,0:-1])**2, axis=1))
 
@@ -268,35 +254,44 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
         #tmp_X = p_X[np.argwhere(dist < m*radius), 0:-1]
         
         while(True):
-        
-            tmp_X = p_X[np.argwhere(dist < m*radius), 0:2]
-            
-            #right = (bsxfun(@minus, tmpX, boundingX(k,1:2)  - intendX ) * edgeDirection(k,1:2)') < 0;
-            #left  = (bsxfun(@minus, tmpX, boundingX(k+1,1:2)+ intendX ) * edgeDirection(k,1:2)') > 0;
-   
+
+            tmp_X = p_X[dist < m*radius, 0:2]
+
             right = np.matmul(tmp_X - np.tile( bounding_X[k, 0:2]   - intend_X, [np.shape(tmp_X)[0], 1]), edge_direction[k, 0:2].T) < 0
             left  = np.matmul(tmp_X - np.tile( bounding_X[k+1, 0:2] + intend_X, [np.shape(tmp_X)[0], 1]), edge_direction[k, 0:2].T) > 0
 
             tmp_X = tmp_X[~np.any(np.vstack([right, left]), axis=0), 0:2]
-
-            if edge_length[k] / tmp_X.shape[0] < radius/3.:
-                break
-            elif m < 2.**7:
-                m = m * 2
-            elif m < 2.**7 + 100.0:
-                m = m + 10.0
-            else:
-                break
+            
+            with np.errstate(divide='ignore'):
+                if edge_length[k] / tmp_X.shape[0] < radius/3:
+                    break
+                elif m < 2**7:
+                    m = m*2
+                elif m < 2**7+100:
+                    m = m+10
+                else:
+                    break
         
-        print(np.shape(tmp_X))
-        print(np.shape(dummy_coordinates))
-
         if tmp_X.size > 0:
             dummy_coordinates = np.vstack([dummy_coordinates, tmp_X])
+            
 
-    dummy_coordinates, _, _ = uniquerows(dummy_coordinates[1:,:])
+    # Since we initialized dummy_coords with a 0 row, pop it out
+    dummy_coordinates = np.delete(dummy_coordinates, 0, axis=0)
+    
+    # MATLAB implementation used the standard "unique" on a float array
+    # Enforced a unique rows with a tolerance of 1e-12 which agrees with
+    # MATLAB's "uniquetol" output
+    dummy_coordinates = np.unique(dummy_coordinates.round(decimals=12), axis=0)
+    
+    # Use matplotlib path to check if we left any points in/on the polygon
+    # Note, python uses 'FALSE' to delete rows, so inverse the logic returned.
+    p = path.Path(bounding_X[:, 0:2])
+    dummy_coordinates = dummy_coordinates[~p.contains_points(dummy_coordinates)]
     
     return dummy_coordinates
+
+# ----------------------------------------------------------------------------
 
 def matlab_prod_of_size(D):
     '''
@@ -308,6 +303,8 @@ def matlab_prod_of_size(D):
     for elem in D:
         prod_of_size.append(len(elem))
     return prod_of_size
+
+# ----------------------------------------------------------------------------
 
 def erase_linearly_dependent_points(X, k):
     '''
@@ -357,6 +354,8 @@ def erase_linearly_dependent_points(X, k):
  
     return boundingX
 
+# ----------------------------------------------------------------------------
+
 def left_hand_assignment(X, a):
     '''
     Attempts to replicate MATLAB left-hand assignment for a 2D array.
@@ -381,7 +380,7 @@ def left_hand_assignment(X, a):
     import numpy as np
     import warnings
     
-    if a.dtype != 'int':
+    if a.dtype != 'int32' or 'int64':
         warnings.warn('parameter ''a'' must be of integer type. Converting ''a'' into integers and moving on...')
 
     a = np.int32(a)
@@ -399,5 +398,223 @@ def left_hand_assignment(X, a):
 
     return bound_X_fin
 
+# ----------------------------------------------------------------------------
+
 def matlabdiff(myArray):
     return myArray[1:,:] - myArray[0:-1,:]
+
+# ----------------------------------------------------------------------------
+
+def gbc_angle(q, CS, D_l, D_r, threshold=5.):
+    '''
+    THIS IS AN INITIAL DRAFT TRANSLATION OF GMTEX's BC_ANGLE
+    
+    
+    # the inputs are: quaternion(ebsd.rotations),ebsd.CSList{p},Dl(ndx),Dr(ndx),gbcValue(p),varargin{:})
+
+    
+    #% FOR TESTING
+    ################## load materials and image 
+    # this whole section will be replaced by graph cut function eventually
+    path = r'/Users/paytone/Documents/GitHub/maxflow_for_matsci/Data/steel_ebsd.ang'
+    
+    # Read each column from the file
+    euler1, euler2, euler3, x, y, iq, dp, phase_id, sem, fit  = np.loadtxt(path, unpack=True)
+    
+    phase_id = np.int32(phase_id)
+    
+    # Create a Rotation object from Euler angles
+    euler_angles = np.column_stack((euler1, euler2, euler3))
+    rotations = Rotation.from_euler(euler_angles)
+    
+    # Create a property dictionary
+    properties = dict(iq=iq, dp=dp)
+    
+    # Create unit cells of the phases
+    structures = [
+        Structure(
+            title="ferrite",
+            atoms=[Atom("fe", [0] * 3)],
+            lattice=Lattice(0.287, 0.287, 0.287, 90, 90, 90)
+        ),
+    ]
+    phase_list = PhaseList(
+        names=["ferrite"],
+        point_groups=["432"],
+        structures=structures,
+    )
+    
+    # Create a CrystalMap instance
+    xmap2 = CrystalMap(
+        rotations=rotations,
+        phase_id=phase_id,
+        x=x,
+        y=y,
+        phase_list=phase_list,
+        prop=properties,
+    )
+    xmap2.scan_unit = "um"
+    
+    import numpy
+    
+    #% get pairs of neighbouring cells {D_l,D_r} in A_D
+    #A_D = I_FD'*I_FD==1;
+    #[Dl,Dr] = find(triu(A_D,1));
+    '''
+        
+    import numpy as np
+    from orix.quaternion import Orientation, Rotation, symmetry, Misorientation
+    
+    # convert threshold into radians
+    threshold = threshold * np.pi / 180.
+    
+    
+    # now check whether the have a misorientation heigher or lower than a threshold
+    o1 = q[D_l] # orientation of node u
+    o2 = q[D_r] # orientation of node v
+    m = Misorientation(o1 * o2.conj) # misorientations between every u and v
+    m.symmetry = (CS, CS) # Oh is symmetry (need to un-hard code)
+    m = m.map_into_symmetry_reduced_zone() #TODO: The result of this doesn't actually make sense. Why are there two rows?
+    
+    criterion = np.abs(m[0,:].angle) > np.cos(threshold/2.0)
+    
+    # Part of mtex code; purpose not clear:
+    #if np.any(~criterion):
+    #  qcs = symm_l.proper_subgroup #TODO: Look into whether this actually makes sense, would be best to use the same symmetry for both L and R but it wasn't clear how to do this in orix at this time
+    #  criterion[~criterion] = np.amax(np.abs(Rotation.dot_outer(m[~criterion],qcs)), axis=1) > np.cos(threshold/2.);
+    
+    # Here is how mtex gets criterion using orientations, not yet possible in orix
+    # o_Dl = orientation(q(Dl),CS,symmetry);
+    # o_Dr = orientation(q(Dr),CS,symmetry);
+    # criterion = dot(o_Dl,o_Dr) > cos(threshold/2);
+    
+    return criterion
+
+# ----------------------------------------------------------------------------
+
+def householderMatrix(v):
+    '''
+    Parameters
+    ----------
+    v : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    H : TYPE
+        DESCRIPTION.
+        
+    For Testing:
+    H_out = np.loadtxt('householder_output.txt', delimiter=',')
+    H_in = np.loadtxt('householder_input.txt', delimiter=',')
+    H_test = householderMatrix(H_in)
+
+    '''
+    import numpy as np
+    # H = @(v) eye(3) - 2./(v(:)'*v(:))*(v(:)*v(:)') ;
+    v = np.atleast_2d(v)
+    H = np.eye(3) - 2. / np.matmul(v, v.T) * np.matmul(v.T, v)
+    return H
+
+# ----------------------------------------------------------------------------
+
+def translationMatrix(s):
+    '''
+    Parameters
+    ----------
+    v\s : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    T : TYPE
+        DESCRIPTION.
+        
+    For Testing:
+    T_out = np.loadtxt('translation_output.txt', delimiter=',')
+    T_in = np.loadtxt('translation_input.txt', delimiter=',')
+    T_test = translationMatrix(T_in)
+    '''
+    import numpy as np
+    T  = np.array([[ 1., 0., s[0]],[0., 1., s[1]],[0., 0., 1.]])
+    return T
+
+# ----------------------------------------------------------------------------
+
+def generateUnitCells(xy, unitCell):
+    '''
+    % generates a list of patches according to spatial coordinates and the unitCell
+    %
+    % Inputs
+    %  xy       - midpoints of the cells
+    %  unitCell - spatial coordinates of the unit cell
+    %
+    % Parameters
+    %  v     - list of vertices
+    %  faces - list of faces
+    
+    # For Testing:
+    xy = np.loadtxt('spatialDecomposition_input_X.csv', delimiter=',')
+    unitCell = np.loadtxt('spatialDecomposition_input_unitCell.csv', delimiter=',') 
+    v, faces = generateUnitCells(xy, unitCell)  
+    randomface = np.random.randint(np.size(xy[:,0]))
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(v[faces[randomface,:],0], v[faces[randomface,:],1], '--')
+    plt.axis('equal')
+    plt.show
+    '''
+    import numpy as np
+    from orix.utilities.utilities import sortrows
+    from orix.utilities import utilities
+
+    def clockwise_sort(points_list):
+        import math
+
+        def angle_to(point):
+        # assumes already mapped to (0,0) center
+        # modify as needed to get result in desired range
+            return math.atan2(point[1],point[0])
+
+        sorted_points = sorted(points_list, key=angle_to, reverse=True)
+        sorted_points = np.roll(sorted_points, 1, axis=0)
+
+        return sorted_points
+
+    unitCell = clockwise_sort(unitCell)
+
+    # add unitCell values to data.
+    def add_unitcell_values(X):
+        X_new = []
+        for elem1 in unitCell:
+            for elem2 in X:
+                X_new.append(list(elem1+elem2))
+
+        X_new = np.array(X_new)
+        return X_new
+        
+    X_new = add_unitcell_values(xy)
+
+    x = X_new[:, 0]
+    y = X_new[:, 1]
+
+    # remove equal points
+    eps = np.amin([np.sqrt(np.diff(unitCell[:,0])**2 + np.diff(unitCell[:,1])**2)])/10.;
+
+    verts = np.squeeze(np.round([x - np.amin(x), y - np.amin(y)]/eps)).T
+
+    v, m, n = utilities.uniquerows(verts)
+    v, order = sortrows(v, return_order=True)
+
+    x = np.squeeze(x)
+    y = np.squeeze(y)
+    m = np.squeeze(m)
+
+
+    v = np.vstack([x[m][order], y[m][order]]).T
+
+    # set faces
+    faces = np.reshape(order[n], [-1,np.size(unitCell[:,1])])
+    
+    return v, faces
+

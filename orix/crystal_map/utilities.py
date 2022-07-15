@@ -7,7 +7,7 @@ Created on Fri Jul 15 09:08:49 2022
 """
 import numpy as np
 
-def spatial_decomposition(X, *args):
+def spatial_decomposition(X, unit_cell=None, *args):
     '''
     % decomposite the spatial domain into cells D with vertices V,
     %
@@ -21,28 +21,25 @@ def spatial_decomposition(X, *args):
     % D   - cell array of Vornoi cells with centers X_D ordered accordingly
     '''
     # Imports
-    import getopt
-    from numpy import cumsum, zeros, unique, sort
+    from numpy import zeros
     from spatialDecompFunctions import generateUnitCells
     from scipy.spatial import Voronoi
-    from scipy.sparse import csr_matrix, coo_array
-    from orix.utilities.utilities import uniquerows
+    from scipy.sparse import csr_matrix
+    from orix.utilities import uniquerows
 
-    if unit_cell.all() == None:
+    if unit_cell == None:
         unit_cell = calcUnitCell(X)
+        
+    # compute the vertices
+    [V, faces] = generateUnitCells(X, unit_cell, args[:])
+    # NOTE: V and faces do not give exact values as compared to the MATLAB
+    # implementation. However, Eric and Rohan have confirmed that V and faces
+    # at least have the same shape as the MATLAB implementation.
 
-    if args[0] == 'unit_cell':
+    D = np.empty(len(X),dtype=object)
 
-        # compute the vertices
-        [V, faces] = generateUnitCells(X, unit_cell, args[:])
-        # NOTE: V and faces do not give exact values as compared to the MATLAB
-        # implementation. However, Eric and Rohan have confirmed that V and faces
-        # at least have the same shape as the MATLAB implementation.
-
-        D = np.empty(len(X),dtype=object)
-
-        for k in range(X.shape[0]):
-            D[k] = faces[k, :]
+    for k in range(X.shape[0]):
+        D[k] = faces[k, :]
 
     else:    
         var_arg_in = args[0]
@@ -136,9 +133,8 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
     from orix.quaternion.rotation import Rotation
     import orix.vector as vect
     from orix.utilities.utilities import uniquerows
+    import alphashape
     
-    from spatialDecompFunctions import householderMatrix, translationMatrix#, erase_linearly_dependent_points
-
     dummy_coordinates = []
 
     boundary = 'hull'
@@ -289,13 +285,23 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
             else:
                 break
         
-        print(np.shape(tmp_X))
-        print(np.shape(dummy_coordinates))
 
         if tmp_X.size > 0:
             dummy_coordinates = np.vstack([dummy_coordinates, tmp_X])
+            
 
-    dummy_coordinates, _, _ = uniquerows(dummy_coordinates[1:,:])
+    # Since we initialized dummy_coords with a 0 row, pop it out
+    dummy_coordinates = np.delete(dummy_coordinates, 0, axis=0)
+    
+    # MATLAB implementation used the standard "unique" on a float array
+    # Enforced a unique rows with a tolerance of 1e-12 which agrees with
+    # MATLAB's "uniquetol" output
+    dummy_coordinates = np.unique(dummy_coordinates.round(decimals=12), axis=0)
+    
+    # Use matplotlib path to check if we left any points in/on the polygon
+    # Note, python uses 'FALSE' to delete rows, so inverse the logic returned.
+    p = path.Path(bounding_X[:, 0:2])
+    dummy_coordinates = dummy_coordinates[~p.contains_points(dummy_coordinates)]
     
     return dummy_coordinates
 
@@ -564,9 +570,6 @@ def generateUnitCells(xy, unitCell):
     from orix.utilities.utilities import sortrows
     from orix.utilities import utilities
 
-    xy = X
-    unitCell = unit_cell
-
     def clockwise_sort(points_list):
         import math
 
@@ -592,11 +595,10 @@ def generateUnitCells(xy, unitCell):
         X_new = np.array(X_new)
         return X_new
         
-    X_new = add_unitcell_values(X)
+    X_new = add_unitcell_values(xy)
 
     x = X_new[:, 0]
     y = X_new[:, 1]
-    #X_new = None
 
     # remove equal points
     eps = np.amin([np.sqrt(np.diff(unitCell[:,0])**2 + np.diff(unitCell[:,1])**2)])/10.;

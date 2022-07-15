@@ -7,7 +7,7 @@ Created on Fri Jul 15 09:08:49 2022
 """
 import numpy as np
 
-def spatial_decomposition(X, unit_cell=None, *args):
+def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 Qs'):
     '''
     % decomposite the spatial domain into cells D with vertices V,
     %
@@ -22,16 +22,15 @@ def spatial_decomposition(X, unit_cell=None, *args):
     '''
     # Imports
     from numpy import zeros
-    from spatialDecompFunctions import generateUnitCells
     from scipy.spatial import Voronoi
     from scipy.sparse import csr_matrix
-    from orix.utilities import uniquerows
+    from orix.utilities.utilities import uniquerows
 
-    if unit_cell == None:
+    if unit_cell.all() == None:
         unit_cell = calcUnitCell(X)
         
     # compute the vertices
-    [V, faces] = generateUnitCells(X, unit_cell, args[:])
+    [V, faces] = generateUnitCells(X, unit_cell)
     # NOTE: V and faces do not give exact values as compared to the MATLAB
     # implementation. However, Eric and Rohan have confirmed that V and faces
     # at least have the same shape as the MATLAB implementation.
@@ -42,11 +41,10 @@ def spatial_decomposition(X, unit_cell=None, *args):
         D[k] = faces[k, :]
 
     else:    
-        var_arg_in = args[0]
-        dummy_coordinates = calcBoundary(X, unit_cell, var_arg_in)
+        dummy_coordinates = calcBoundary(X, unit_cell, boundary)
 
         vor = Voronoi(np.vstack([X, dummy_coordinates]), 
-                        qhull_options = 'Q5 Q6 Qs') #,'QbB'
+                        qhull_options = qhull_opts) #,'QbB'
 
         V = vor.vertices
         D = vor.regions
@@ -95,7 +93,7 @@ def spatial_decomposition(X, unit_cell=None, *args):
 
     return V, F, I_FD
 
-def calcBoundary(X, unit_cell, var_arg_in='hull'):
+def calcBoundary(X, unit_cell, boundary='hull'):
     '''
     dummy coordinates so that the voronoi-cells of X are finite
 
@@ -134,11 +132,9 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
     import orix.vector as vect
     from orix.utilities.utilities import uniquerows
     import alphashape
+    from matplotlib import path
     
     dummy_coordinates = []
-
-    boundary = 'hull'
-    boundary = str(var_arg_in)
 
     if boundary.isalpha():
         
@@ -162,7 +158,10 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
         elif (boundary.lower() == 'hull' or
             boundary.lower() == 'convexhull'):
             
-            bounding_X  = erase_linearly_dependent_points(X)
+            k = ConvexHull(X)
+            k2 = k.vertices
+            
+            bounding_X  = erase_linearly_dependent_points(X, k2)
             
             #Testing
             #import matplotlib.pyplot as plt
@@ -183,7 +182,7 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
 
         else:
             raise ValueError('Unknown boundary type. Available options are \
-            ''hull'', ''convexhull'' and ''cube''.')
+            ''tight'',''hull'', ''convexhull'' and ''cube''.')
 
     elif isinstance(boundary, float):
         bounding_X = boundary
@@ -243,16 +242,6 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
             )
         )
 
-        '''
-        NOTE FROM ERIC AND ROHAN: We are having problems with getting the proper
-        dummy_coordinates. The bounding box only has 2 of 4 lines, we believe
-        this is where the problem is. MATLAB is doing bizarre things with the
-        element-wise division!!!!! We need to contact somebody about this behavior.
-        Python is doing what we expect but it's not the right answer.
-        
-        UPDATE FROM ERIC: Changing the order of operations in Python gives the same result as Matlab.
-        '''
-
         # distance between original and mirrored point
         dist = np.sqrt(np.sum((X[:,0:-1]-p_X[:,0:-1])**2, axis=1))
 
@@ -265,27 +254,24 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
         #tmp_X = p_X[np.argwhere(dist < m*radius), 0:-1]
         
         while(True):
-        
-            tmp_X = p_X[np.argwhere(dist < m*radius), 0:2]
-            
-            #right = (bsxfun(@minus, tmpX, boundingX(k,1:2)  - intendX ) * edgeDirection(k,1:2)') < 0;
-            #left  = (bsxfun(@minus, tmpX, boundingX(k+1,1:2)+ intendX ) * edgeDirection(k,1:2)') > 0;
-   
+
+            tmp_X = p_X[dist < m*radius, 0:2]
+
             right = np.matmul(tmp_X - np.tile( bounding_X[k, 0:2]   - intend_X, [np.shape(tmp_X)[0], 1]), edge_direction[k, 0:2].T) < 0
             left  = np.matmul(tmp_X - np.tile( bounding_X[k+1, 0:2] + intend_X, [np.shape(tmp_X)[0], 1]), edge_direction[k, 0:2].T) > 0
 
             tmp_X = tmp_X[~np.any(np.vstack([right, left]), axis=0), 0:2]
-
-            if edge_length[k] / tmp_X.shape[0] < radius/3.:
-                break
-            elif m < 2.**7:
-                m = m * 2
-            elif m < 2.**7 + 100.0:
-                m = m + 10.0
-            else:
-                break
+            
+            with np.errstate(divide='ignore'):
+                if edge_length[k] / tmp_X.shape[0] < radius/3:
+                    break
+                elif m < 2**7:
+                    m = m*2
+                elif m < 2**7+100:
+                    m = m+10
+                else:
+                    break
         
-
         if tmp_X.size > 0:
             dummy_coordinates = np.vstack([dummy_coordinates, tmp_X])
             
@@ -305,6 +291,8 @@ def calcBoundary(X, unit_cell, var_arg_in='hull'):
     
     return dummy_coordinates
 
+# ----------------------------------------------------------------------------
+
 def matlab_prod_of_size(D):
     '''
     Testing:
@@ -315,6 +303,8 @@ def matlab_prod_of_size(D):
     for elem in D:
         prod_of_size.append(len(elem))
     return prod_of_size
+
+# ----------------------------------------------------------------------------
 
 def erase_linearly_dependent_points(X, k):
     '''
@@ -364,6 +354,8 @@ def erase_linearly_dependent_points(X, k):
  
     return boundingX
 
+# ----------------------------------------------------------------------------
+
 def left_hand_assignment(X, a):
     '''
     Attempts to replicate MATLAB left-hand assignment for a 2D array.
@@ -388,7 +380,7 @@ def left_hand_assignment(X, a):
     import numpy as np
     import warnings
     
-    if a.dtype != 'int':
+    if a.dtype != 'int32' or 'int64':
         warnings.warn('parameter ''a'' must be of integer type. Converting ''a'' into integers and moving on...')
 
     a = np.int32(a)
@@ -406,8 +398,12 @@ def left_hand_assignment(X, a):
 
     return bound_X_fin
 
+# ----------------------------------------------------------------------------
+
 def matlabdiff(myArray):
     return myArray[1:,:] - myArray[0:-1,:]
+
+# ----------------------------------------------------------------------------
 
 def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     '''
@@ -494,6 +490,7 @@ def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     
     return criterion
 
+# ----------------------------------------------------------------------------
 
 def householderMatrix(v):
     '''
@@ -519,6 +516,8 @@ def householderMatrix(v):
     H = np.eye(3) - 2. / np.matmul(v, v.T) * np.matmul(v.T, v)
     return H
 
+# ----------------------------------------------------------------------------
+
 def translationMatrix(s):
     '''
     Parameters
@@ -540,8 +539,7 @@ def translationMatrix(s):
     T  = np.array([[ 1., 0., s[0]],[0., 1., s[1]],[0., 0., 1.]])
     return T
 
-
-
+# ----------------------------------------------------------------------------
 
 def generateUnitCells(xy, unitCell):
     '''

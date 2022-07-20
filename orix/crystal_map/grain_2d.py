@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+
+"""
+Author: Tyler Martin
+Github: martint98
+Date: 5/16/2022
+"""
+
 import numpy as np
 from scipy import sparse
 from scipy.io import loadmat
@@ -145,9 +153,19 @@ class grain2d:
         #     #     end
 
 
-if __name__ == '__main__':
-    X = np.loadtxt('C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\spatialDecomposition_input_X.csv', delimiter=',', dtype=float)
-    uc = np.loadtxt('C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\calcUnitCell_output_unitCell.csv', delimiter=',', dtype=float)
+def main():
+    X = np.loadtxt(
+        'C:\\git\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\spatialDecomposition_input_X.csv',
+        delimiter=',', dtype=float)
+    uc = np.loadtxt(
+        'C:\\git\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\calcUnitCell_output_unitCell.csv',
+        delimiter=',', dtype=float)
+    # X = np.loadtxt(
+    #     'C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\'
+    #     'spatialDecomposition_input_X.csv', delimiter=',', dtype=float)
+    # uc = np.loadtxt(
+    #     'C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\spatial_decomposition_test_folder\\'
+    #     'calcUnitCell_output_unitCell.csv', delimiter=',', dtype=float)
     # ebsd_path = "C:\\PyRepo\\measureGrainSize\\GS_Meas\\myEBSD_high_res_1.mat"
     # ebsd = loadmat(ebsd_path)
     # ebsd_x_path = "C:\\PyRepo\\measureGrainSize\\GS_Meas\\myEBSD_high_res_1_x.mat"
@@ -159,9 +177,14 @@ if __name__ == '__main__':
     V, F, I_FD = utilities.spatial_decomposition(X, unit_cell=uc)
     # V, F, I_FD = utilities.spatial_decomposition(np.array([ebsd_x, ebsd_y]), unitCell)
     # print(f"V = {V}\nF = {F}\nI_FD = {I_FD}")
-    mySteel = orix.io.loadang('C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\Data\\steel_ebsd.ang')
+    mySteel = orix.io.loadang('C:\\git\\Mart2Aust_Hackathon\\Data\\steel_ebsd.ang')
+    # mySteel = orix.io.loadang('C:\\PyRepo\\Hackathon\\Mart2Aust_Hackathon\\Data\\steel_ebsd.ang')
     ebsd = CrystalMap(mySteel)
     # myGrain = grain2d(ebsd, V, F, I_DG, I_FD, A_Db)
+
+
+if __name__ == '__main__':
+    main()
 
 ###### MTEX grain2d structure code below
 # classdef grain2d < phaseList & dynProp

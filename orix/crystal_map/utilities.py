@@ -6,6 +6,23 @@ Created on Fri Jul 15 09:08:49 2022
 @author: paytone
 """
 import numpy as np
+import networkx as nx
+import getopt
+from scipy.sparse import csr_matrix
+from scipy.spatial import ConvexHull, Voronoi
+from numpy import arctan2, cumsum, matrix, squeeze, unique, linspace,zeros
+from statistics import mean
+from math import sqrt, floor, copysign
+from orix.quaternion import Orientation, Rotation, symmetry, Misorientation
+from orix.quaternion.rotation import Rotation
+import orix.vector as vect
+from orix.utilities import utilities
+from orix.utilities.utilities import sortrows, regularPoly, uniquerows
+from matplotlib import path
+import matplotlib.pyplot as plt
+import math
+import warnings
+import alphashape
 
 def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 Qs'):
     '''
@@ -20,11 +37,8 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     % V - list of vertices of the Voronoi cells
     % D   - cell array of Vornoi cells with centers X_D ordered accordingly
     '''
-    # Imports
-    from numpy import zeros
-    from scipy.spatial import Voronoi
-    from scipy.sparse import csr_matrix
-    from orix.utilities.utilities import uniquerows
+
+    print(f"X = {X}")
 
     if unit_cell.all() == None:
         unit_cell = calcUnitCell(X)
@@ -35,7 +49,7 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     # implementation. However, Eric and Rohan have confirmed that V and faces
     # at least have the same shape as the MATLAB implementation.
 
-    D = np.empty(len(X),dtype=object)
+    D = np.empty(len(X), dtype=object)
 
     for k in range(X.shape[0]):
         D[k] = faces[k, :]
@@ -43,8 +57,7 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     else:    
         dummy_coordinates = calcBoundary(X, unit_cell, boundary)
 
-        vor = Voronoi(np.vstack([X, dummy_coordinates]), 
-                        qhull_options = qhull_opts) #,'QbB'
+        vor = Voronoi(np.vstack([X, dummy_coordinates]), qhull_options=qhull_opts)  # ,'QbB'
 
         V = vor.vertices
         D = vor.regions
@@ -73,14 +86,25 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     # edges list
     F = np.vstack([iv[:], iv_n[:]]).T
 
+    print(f"edges before unique = {F}")
+    print(f"shape edges before unique = {np.shape(F)}")
+
     # should be unique (i.e one edge is incident to two cells D)
-    F, _, ie = uniquerows(F)
+    edges, ia, ie = uniquerows(F)   # numpy indexing arrays such that edges = F[ia] and F = edges[ie]
+
+    print(f"unique edges = {edges}")
+    print(f"shape edges after unique = {np.shape(edges)}")
 
     # faces incident to cells, F x D
     #original matlab: I_FD = sparse(ie,id,1); 
     # Matlab stores as csr matrix, so we use this class below
     data = np.ones(np.shape(ie))
-    I_FD = csr_matrix( (data, (ie, iid)))
+    I_FD = csr_matrix((data, (ie, iid)))
+    print(f"len(cell number) = {len(iid)}")
+    print(f"cell number = {iid}")
+    print(f"len(face incident to cell) = {len(ie)}")
+    print(f"face incident to cell = {ie}")
+
     #I_FD = csr_matrix( (data, (ie, iid)), shape=[ie.shape[0], ie.shape[0]]) # could also use csc_matrix() if it improves
                                 # performance !
     '''
@@ -89,9 +113,9 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
           
           Could also be causing problems in the Householder matrix initialization.
     '''
-    
 
-    return V, F, I_FD
+    return V, edges, I_FD
+
 
 def calcBoundary(X, unit_cell, boundary='hull'):
     '''
@@ -121,18 +145,6 @@ def calcBoundary(X, unit_cell, boundary='hull'):
     from statistics import mean
     from math import sqrt, floor, copysign
     '''
-    # Imports
-    import getopt
-    import numpy as np
-    from scipy.spatial import ConvexHull
-    from numpy import arctan2, cumsum, matrix, squeeze, unique, linspace
-    from statistics import mean
-    from math import sqrt, floor, copysign
-    from orix.quaternion.rotation import Rotation
-    import orix.vector as vect
-    from orix.utilities.utilities import uniquerows
-    import alphashape
-    from matplotlib import path
     
     dummy_coordinates = []
 
@@ -323,11 +335,6 @@ def erase_linearly_dependent_points(X, k):
     --------------
     from scipy.spatial import ConvexHull
     '''
-    from orix.utilities.utilities import regularPoly
-    import numpy as np
-    from scipy.spatial import ConvexHull
-    from orix.utilities.utilities import sortrows
-    import alphashape
 
     # erase all linear dependent points
     angle = np.arctan2(X[k[0:-1],0]-X[k[1:],0],
@@ -376,9 +383,6 @@ def left_hand_assignment(X, a):
     --------------
     import numpy as np
     '''
- 
-    import numpy as np
-    import warnings
     
     if a.dtype != 'int32' or 'int64':
         warnings.warn('parameter ''a'' must be of integer type. Converting ''a'' into integers and moving on...')
@@ -461,9 +465,6 @@ def gbc_angle(q, CS, D_l, D_r, threshold=5.):
     #A_D = I_FD'*I_FD==1;
     #[Dl,Dr] = find(triu(A_D,1));
     '''
-        
-    import numpy as np
-    from orix.quaternion import Orientation, Rotation, symmetry, Misorientation
     
     # convert threshold into radians
     threshold = threshold * np.pi / 180.
@@ -510,7 +511,6 @@ def householderMatrix(v):
     H_test = householderMatrix(H_in)
 
     '''
-    import numpy as np
     # H = @(v) eye(3) - 2./(v(:)'*v(:))*(v(:)*v(:)') ;
     v = np.atleast_2d(v)
     H = np.eye(3) - 2. / np.matmul(v, v.T) * np.matmul(v.T, v)
@@ -535,7 +535,6 @@ def translationMatrix(s):
     T_in = np.loadtxt('translation_input.txt', delimiter=',')
     T_test = translationMatrix(T_in)
     '''
-    import numpy as np
     T  = np.array([[ 1., 0., s[0]],[0., 1., s[1]],[0., 0., 1.]])
     return T
 
@@ -564,12 +563,7 @@ def generateUnitCells(xy, unitCell):
     plt.axis('equal')
     plt.show
     '''
-    import numpy as np
-    from orix.utilities.utilities import sortrows
-    from orix.utilities import utilities
-
     def clockwise_sort(points_list):
-        import math
 
         def angle_to(point):
         # assumes already mapped to (0,0) center
@@ -622,10 +616,6 @@ def calcUnitCell(xy, *args):
     '''
     Compute the unit cell for an EBSD data set
     '''
-    
-    import numpy as np
-    from scipy.spatial import Voronoi
-    
     # isempty return
     ## NOT WRITTEN
     
@@ -721,7 +711,6 @@ def subSample(xy, N):
     '''
     Find a square subset of about N points
     '''
-    import numpy as np
     
     xminmax = np.vstack([np.min(xy[:,0]), np.max(xy[:,0])])
     yminmax = np.vstack([np.min(xy[:,1]), np.max(xy[:,1])])
@@ -745,9 +734,6 @@ def polyArea(x,y):
     return 0.50*np.abs(np.dot(x,np.roll(y,1))-np.dot(y,np.roll(x,1)))
 
 def isRegularPoly(unitCell):
-    
-    import numpy as np
-    
     # Compute the side lengths of all the "edges"
     sideLength = np.sqrt(np.sum(np.power(unitCell,2), axis=1))
     sides = sideLength.size

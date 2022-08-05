@@ -7,7 +7,7 @@ Date: 5/16/2022
 """
 import pickle
 import time
-
+from tqdm import tqdm
 import numpy as np
 from scipy import sparse
 from scipy.io import loadmat
@@ -15,9 +15,9 @@ import networkx as nx
 import matplotlib
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-
 import orix.io
 from orix.crystal_map import CrystalMap, utilities
+
 
 class grain2d:
     def __init__(self, ebsd, V, F, I_DG, I_FD, A_Db):
@@ -191,82 +191,130 @@ def main():
     print(f"I_FD = {I_FD}")
     # print(type(I_FD))
     print(f"shape I_FD = {np.shape(I_FD)}")
+    face_one = F[0]
+    print(f"face_one = {face_one}")
+    face_one_vert_one_ind = face_one[0]
+    print(f"face_one_vert_one_ind = {face_one_vert_one_ind}")
+    face_one_vert_one_coords = V[face_one[0]]
+    print(f"face_one_vert_one_coords = {face_one_vert_one_coords}")
+    face_one_vert_two_ind = face_one[1]
+    print(f"face_one_vert_two_ind = {face_one_vert_two_ind}")
+    face_one_vert_two_coords = V[face_one[1]]
+    print(f"face_one_vert_two_coords = {face_one_vert_two_coords}")
+
+    face_1_coords = V[F[0]]
+    print(f"face_1_coords = {face_1_coords}")
+    faces = V[F[:]]
+    print(f"faces = {faces}")
+    print(f"shape faces = {np.shape(faces)}")
+    faces_x_coords = faces[:, :, 0]
+    print(f"faces_x_coords = {faces_x_coords}")
+    print(f"shape faces_x_coords = {np.shape(faces_x_coords)}")
+    faces_y_coords = faces[:, :, 1]
+    print(f"faces_y_coords = {faces_y_coords}")
+    print(f"shape faces_y_coords = {np.shape(faces_y_coords)}")
+
+    print(f"face_1_x_coords = {faces_x_coords[0]}")
+
     plt.style.use('dark_background')
     plt.rc('axes', axisbelow=True)
 
-    start_time = time.time()
     plt.figure()
-    plt.scatter(V[:, 0], V[:, 1], c='red', s=0.0001)
-    plt.ylabel(r'microns?, $[/micron/m]$', fontsize=18)
-    plt.xlabel('microns', fontsize=18)
-    # plt.ylim([0,100])
-    plt.yticks(fontsize=16, rotation=0)
-    plt.xticks(fontsize=16, rotation=0)
-    plt.grid()
-    plt.box(on=False)
-    plt.tight_layout()
-    # plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/test1.tiff", dpi=2000)
+    start_time = time.time()
+    plt.plot(faces_x_coords[:100000], faces_y_coords[:100000])
+    # plt.scatter(face_x_coords, face_y_coords)
     end_time = time.time()
+    time_to_plot = end_time - start_time
+    plt.title(f"Line Plot of Face Endpoints ({round(time_to_plot, 3)}s)")
+    plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/Line Plot Test.tiff", dpi=4000)
     plt.show()
-    print(f"Time to plot vertices = {end_time - start_time}")
 
-
-    scaled_F = F/1000
-    start_time = time.time()
-    plt.figure()
-    plt.scatter(scaled_F[:, 0], scaled_F[:, 1], c="red", s=0.001)
-    plt.ylabel(r'microns?, $[/micron/m]$', fontsize=18)
-    plt.xlabel('microns', fontsize=18)
+    # start_time = time.time()
+    # plt.figure()
+    # plt.scatter(V[:, 0], V[:, 1], c='red', s=0.0001)
+    # plt.ylabel(r'microns?, $[/micron/m]$', fontsize=18)
+    # plt.xlabel('microns', fontsize=18)
     # plt.ylim([0,100])
     # plt.yticks(fontsize=16, rotation=0)
     # plt.xticks(fontsize=16, rotation=0)
     # plt.grid()
     # plt.box(on=False)
     # plt.tight_layout()
-    # plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/test2.tiff", dpi=2000)
-    end_time = time.time()
-    plt.show()
-    print(f"Time to plot faces = {end_time - start_time}")
+    # plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/test1.tiff", dpi=4000)
+    # end_time = time.time()
+    # plt.show()
+    # print(f"Time to plot vertices = {end_time - start_time}")
+    #
+    #
+    # scaled_F = F/1000
+    # start_time = time.time()
+    # plt.figure()
+    # plt.scatter(scaled_F[:, 0], scaled_F[:, 1], c="red", s=0.0001)
+    # plt.ylabel(r'microns?, $[/micron/m]$', fontsize=18)
+    # plt.xlabel('microns', fontsize=18)
+    # # plt.ylim([0,100])
+    # # plt.yticks(fontsize=16, rotation=0)
+    # # plt.xticks(fontsize=16, rotation=0)
+    # # plt.grid()
+    # # plt.box(on=False)
+    # # plt.tight_layout()
+    # # plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/test2.tiff", dpi=4000)
+    # end_time = time.time()
+    # plt.show()
+    # # print(f"Time to plot faces = {end_time - start_time}")
 
-    # Testing
-    G = nx.Graph()  # Create an empty graph with no nodes and no edges.
-    node = [1, 2, 3]
-    F = [[1, 2], [2, 3], [3, 1]]
-    G.add_nodes_from(node)
-    G.add_edges_from(F)
-    print(f"g.number_of_nodes() = {G.number_of_nodes()}")
-    print(f"g.number_of_edges() = {G.number_of_edges()}")
-    nx.draw(G)
-    plt.show()
+    # # Testing
+    # G = nx.Graph()  # Create an empty graph with no nodes and no edges.
+    # # node_number = np.arange(start=0, stop=(len(V)))
+    # node_coords =
+    # # node = np.arange(start=0, stop=(len(V))/100)
+    # node = [1, 2, 3]
+    # F = [[1, 2], [2, 3], [3, 1]]
+    # G.add_nodes_from(node)
+    # nx.set_node_attributes(G, verts, 'coord')
+    # G.add_edges_from(F)
+    # # print(f"g.number_of_nodes() = {G.number_of_nodes()}")
+    # # print(f"g.number_of_edges() = {G.number_of_edges()}")
+    # nx.draw(G, node_size=10, node_color='red')
+    # plt.show()
 
-    # Protype
-    node_number = np.arange(start=0, stop=len(V))
-    G = nx.Graph()  # Create an empty graph with no nodes and no edges.
-    G.add_nodes_from(V)
-    G.add_edges_from(F)
-    incidence_cell_face = I_FD[0]
-    print(len(incidence_cell_face))
-    # for node in V[0:1000]:
-    #     G.add_nodes_from(node, c='red', s=0.001)
-    # G.add_edges_from(F[0:1000], c='blue', s=0.001)
-    # print(f"g.number_of_nodes() = {G.number_of_nodes()}")
-    # print(f"g.number_of_edges() = {G.number_of_edges()}")
-    nx.draw(G)
-    plt.show()
+    # # Protype
+    # node_number = np.arange(start=0, stop=len(V))
+    # G = nx.Graph()  # Create an empty graph with no nodes and no edges.
+    # end_ind = int(len(V)/8)
+    # for node in tqdm(node_number[0:end_ind], desc="Plotting nodes"):
+    #     G.add_node(node)
+    # # G.add_edges_from(F)
+    # # incidence_cell_face = I_FD[0]
+    # # print(len(incidence_cell_face[0]))
+    # # for node in V[0:1000]:
+    # #     G.add_nodes_from(node, c='red', s=0.001)
+    # # G.add_edges_from(F[0:1000], c='blue', s=0.001)
+    # # print(f"g.number_of_nodes() = {G.number_of_nodes()}")
+    # # print(f"g.number_of_edges() = {G.number_of_edges()}")
+    # print(f"Added {end_ind} nodes!")
+    # nx.draw(G)
+    # print(f"Drawing done")
+    # plt.savefig(f"C:/git/Mart2Aust_Hackathon/orix/tests/crystal_map/test4.tiff", dpi=1000)
+    # print(f"Saving done")
+    # plt.show()
 
+    # node_number = np.arange(start=0, stop=len(V))
+    # node_vertices = V
+    #
     # start_time = time.time()
     # plt.figure()
     # fig, ax = plt.subplots()
-    # ax.scatter(V[:, 0], V[:, 1], color="deepskyblue", label="V'")
-    # ax.scatter(scaled_F[:, 0], scaled_F[:, 1], color="darkorange", s=0.01, label="F")
+    # # ax.scatter(V[:, 0], V[:, 1], color="deepskyblue", label="V'")
+    # # ax.scatter(scaled_F[:, 0], scaled_F[:, 1], color="darkorange", s=0.01, label="F")
     # plt.xlabel('microns', fontsize=18)
     # plt.ylabel('microns [um]', fontsize=18)
-    # verts = mpatches.Patch(color='deepskyblue', label='Vertices')
-    # faces = mpatches.Patch(color='darkorange', label='Faces')
-    # legend = ax.legend(handles=[verts, faces])
-    # frame = legend.get_frame()
-    # frame.set_linewidth(0)
-    # frame.set_alpha(1)
+    # # verts = mpatches.Patch(color='deepskyblue', label='Vertices')
+    # # faces = mpatches.Patch(color='darkorange', label='Faces')
+    # # legend = ax.legend(handles=[verts, faces])
+    # # frame = legend.get_frame()
+    # # frame.set_linewidth(0)
+    # # frame.set_alpha(1)
     # plt.yticks(fontsize=16, rotation=0)
     # plt.xticks(fontsize=16, rotation=0)
     # plt.grid()
@@ -276,9 +324,6 @@ def main():
     # end_time = time.time()
     # plt.show()
     # print(f"Time to plot verts and faces = {end_time - start_time}")
-
-    # GPT prompt
-    # Python code that plots ebsd scan from Vornoi cells with a numpy array of vertices, a numpy array of faces, and a scipy.sparse.csr_matrix cell-face incidence
 
     # # V, F, I_FD = utilities.spatial_decomposition(np.array([ebsd_x, ebsd_y]), unitCell)
     # # print(f"V = {V}\nF = {F}\nI_FD = {I_FD}")

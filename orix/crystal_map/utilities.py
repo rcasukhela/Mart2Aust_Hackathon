@@ -6,10 +6,11 @@ Created on Fri Jul 15 09:08:49 2022
 @author: paytone
 """
 import numpy as np
+import time
 import networkx as nx
 import getopt
 from scipy.sparse import csr_matrix
-from scipy.spatial import ConvexHull, Voronoi
+from scipy.spatial import ConvexHull, Voronoi, voronoi_plot_2d
 from numpy import arctan2, cumsum, matrix, squeeze, unique, linspace,zeros
 from statistics import mean
 from math import sqrt, floor, copysign
@@ -38,8 +39,6 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     % D   - cell array of Vornoi cells with centers X_D ordered accordingly
     '''
 
-    print(f"X = {X}")
-
     if unit_cell.all() == None:
         unit_cell = calcUnitCell(X)
         
@@ -54,18 +53,18 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     for k in range(X.shape[0]):
         D[k] = faces[k, :]
 
-    else:    
+    else:
         dummy_coordinates = calcBoundary(X, unit_cell, boundary)
 
         vor = Voronoi(np.vstack([X, dummy_coordinates]), qhull_options=qhull_opts)  # ,'QbB'
 
-        V = vor.vertices
-        D = vor.regions
-        D = D[0:X.shape[0]]
+        V = vor.vertices                            # vertices of the voronoi diagram
+        D = vor.regions                             # list of faces of the Voronoi cells
+        D = D[0:X.shape[0]]                         # Cut off the dummy coordinates
 
     # now we need some adjacencies and incidences
-    iv = np.hstack(D)        # nodes incident to cells D
-    iid = zeros(len(iv), dtype=np.int64)   # number the cells
+    iv = np.hstack(D)                       # nodes incident to cells D
+    iid = zeros(len(iv), dtype=np.int64)    # number the cells
 
     # Some MATLAB stuff goin on here... : p = [0; cumsum(cellfun('prodofsize',D))];
     D_prod = matlab_prod_of_size(D)
@@ -86,24 +85,14 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
     # edges list
     F = np.vstack([iv[:], iv_n[:]]).T
 
-    print(f"edges before unique = {F}")
-    print(f"shape edges before unique = {np.shape(F)}")
-
     # should be unique (i.e one edge is incident to two cells D)
-    edges, ia, ie = uniquerows(F)   # numpy indexing arrays such that edges = F[ia] and F = edges[ie]
-
-    print(f"unique edges = {edges}")
-    print(f"shape edges after unique = {np.shape(edges)}")
+    F, ia, ie = uniquerows(F)   # numpy indexing arrays such that edges = F[ia] and F = edges[ie]
 
     # faces incident to cells, F x D
     #original matlab: I_FD = sparse(ie,id,1); 
     # Matlab stores as csr matrix, so we use this class below
     data = np.ones(np.shape(ie))
     I_FD = csr_matrix((data, (ie, iid)))
-    print(f"len(cell number) = {len(iid)}")
-    print(f"cell number = {iid}")
-    print(f"len(face incident to cell) = {len(ie)}")
-    print(f"face incident to cell = {ie}")
 
     #I_FD = csr_matrix( (data, (ie, iid)), shape=[ie.shape[0], ie.shape[0]]) # could also use csc_matrix() if it improves
                                 # performance !
@@ -114,7 +103,7 @@ def spatial_decomposition(X, unit_cell=None, boundary='hull', qhull_opts='Q5 Q6 
           Could also be causing problems in the Householder matrix initialization.
     '''
 
-    return V, edges, I_FD
+    return V, F, I_FD
 
 
 def calcBoundary(X, unit_cell, boundary='hull'):
